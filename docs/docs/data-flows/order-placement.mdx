@@ -21,10 +21,10 @@ sequenceDiagram
 
   Client->>Traefik: POST /api/orders
   Traefik->>OrderAPI: forward request
-  OrderAPI->>Postgres: BEGIN; INSERT order + items
+  OrderAPI->>Postgres: "BEGIN transaction, insert order and items"
   Postgres-->>OrderAPI: committed
   OrderAPI->>Redpanda: publish order.created
-  OrderAPI-->>Client: 201 Created {order_id}
+  OrderAPI-->>Client: "201 Created with order_id"
 
   Redpanda->>Processor: deliver order.created
   Processor->>Processor: validate JSON schema
