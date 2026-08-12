@@ -1,0 +1,101 @@
+---
+sidebar_position: 7
+---
+
+# Storage
+
+StreamShop uses four distinct storage technologies, each chosen for a specific access pattern.
+
+## Storage map
+
+| Store | Type | Technology | Primary data |
+|-------|------|------------|--------------|
+| PostgreSQL | SQL (OLTP) | PostgreSQL 16 | Orders, order items, users |
+| MongoDB | NoSQL | MongoDB 7 | Product catalog (flexible schema) |
+| ClickHouse | OLAP | ClickHouse 24 | Order event facts, aggregates |
+| MinIO | Object | MinIO (S3-compatible) | Product images, CSV exports |
+| Redis | Cache | Redis 7 | Hot reads, idempotency keys |
+
+## PostgreSQL (OLTP)
+
+Relational storage for transactional order data.
+
+```sql
+CREATE TABLE orders (
+  id          UUID PRIMARY KEY,
+  user_id     UUID NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'pending',
+  total_cents INTEGER NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE order_items (
+  order_id    UUID REFERENCES orders(id),
+  product_id  TEXT NOT NULL,
+  qty         INTEGER NOT NULL,
+  price_cents INTEGER NOT NULL
+);
+```
+
+**Accessed by:** `order-api` (writes), `event-processor` (status updates), `analytics-api` (detail reads)
+
+## MongoDB (NoSQL)
+
+Document store for the product catalog. Products have variable attributes (color, size, material) that don't fit a rigid relational schema.
+
+```json
+{
+  "_id": "prod-001",
+  "name": "Running Shoes",
+  "price_cents": 8999,
+  "attributes": {
+    "color": "blue",
+    "size": ["8", "9", "10"],
+    "material": "mesh"
+  }
+}
+```
+
+**Accessed by:** `catalog-api` (read/write)
+
+## ClickHouse (OLAP)
+
+Columnar analytics store for denormalized order event facts.
+
+```sql
+CREATE TABLE order_events (
+  order_id     UUID,
+  user_id      UUID,
+  total_cents  UInt32,
+  item_count   UInt8,
+  event_time   DateTime,
+  processed_at DateTime
+) ENGINE = MergeTree()
+ORDER BY (event_time, order_id);
+```
+
+Materialized views power hourly revenue aggregates queried by `analytics-api`.
+
+**Accessed by:** `event-processor` (writes), `analytics-api` (reads)
+
+## MinIO (Object storage)
+
+S3-compatible object storage for binary assets.
+
+| Bucket | Contents | Access |
+|--------|----------|--------|
+| `product-images` | Product photos | Presigned GET URLs |
+| `exports` | CSV analytics exports | Internal only |
+
+**Accessed by:** `catalog-api` (upload), `analytics-api` (export, optional)
+
+## Why not one database?
+
+| Pattern | Wrong tool | Right tool |
+|---------|-----------|------------|
+| Flexible product attributes | Postgres JSONB (works, but awkward) | MongoDB documents |
+| Hourly revenue rollups | Postgres aggregation (slow at scale) | ClickHouse columnar scans |
+| Product image blobs | Postgres BYTEA (expensive, wrong abstraction) | MinIO object storage |
+| Order transactions | MongoDB (no ACID across documents) | PostgreSQL |
+
+See individual ADRs for detailed rationale: [ClickHouse](../adr/clickhouse-for-olap), [MongoDB](../adr/mongo-for-catalog).

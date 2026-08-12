@@ -1,0 +1,63 @@
+---
+sidebar_position: 1
+---
+
+# Reset Data
+
+Use this runbook to wipe all local data and re-seed the system with fresh sample data.
+
+## When to use
+
+- Demo preparation before an interview
+- Recovering from a corrupted local state
+- Testing the seed script after schema changes
+
+## Steps
+
+### 1. Stop all services
+
+```bash
+docker compose down
+```
+
+### 2. Remove volumes
+
+```bash
+docker compose down -v
+```
+
+This deletes all Postgres, MongoDB, ClickHouse, Redis, and MinIO data.
+
+### 3. Restart and seed
+
+```bash
+docker compose --profile full up -d
+./scripts/seed.sh
+```
+
+The seed script:
+
+- Inserts sample products into MongoDB
+- Creates test users in PostgreSQL
+- Creates Redpanda topics (`orders.events`, `orders.events.dlq`)
+- Uploads sample product images to MinIO
+
+### 4. Verify
+
+```bash
+./scripts/smoke-test.sh
+```
+
+Expected output: all health checks pass, sample order created and processed within 5 seconds.
+
+## Reset a single datastore
+
+| Store | Command |
+|-------|---------|
+| PostgreSQL | `docker compose exec postgres psql -U streamshop -c 'TRUNCATE orders, order_items CASCADE'` |
+| MongoDB | `docker compose exec mongo mongosh streamshop --eval 'db.products.deleteMany({})'` |
+| ClickHouse | `docker compose exec clickhouse clickhouse-client -q 'TRUNCATE TABLE order_events'` |
+| Redis | `docker compose exec redis redis-cli FLUSHALL` |
+| MinIO | `docker compose exec minio mc rm --recursive --force local/product-images/` |
+
+After a partial reset, run `./scripts/seed.sh` to restore sample data.

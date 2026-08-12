@@ -1,0 +1,88 @@
+---
+sidebar_position: 2
+---
+
+# Inspect Kafka Lag
+
+Use this runbook to diagnose message processing delays in the Redpanda pipeline.
+
+## When to use
+
+- Orders are created but analytics are stale
+- `event-processor` was restarted or crashed
+- Demoing failure recovery in an interview
+
+## Check consumer lag
+
+### Via rpk CLI
+
+```bash
+docker compose exec redpanda rpk group describe event-processor
+```
+
+Look for `LAG` column per partition. Zero lag means the processor is caught up.
+
+### Via Prometheus
+
+Query in Grafana or directly:
+
+```
+kafka_consumer_lag{group="event-processor", topic="orders.events"}
+```
+
+## Check processor health
+
+```bash
+# Is the processor running?
+docker compose ps event-processor
+
+# Recent logs
+docker compose logs --tail=50 event-processor
+
+# Health endpoint
+curl http://localhost:3004/health
+```
+
+## Common causes and fixes
+
+| Symptom | Likely cause | Fix |
+|---------|-------------|-----|
+| Lag growing steadily | Processor crashed | `docker compose restart event-processor` |
+| Lag spike then recovery | Transient ClickHouse slow write | Monitor; add retry if recurring |
+| Lag stuck, no errors | Offset committed but write failed | Check DLQ: `rpk topic consume orders.events.dlq` |
+| Messages in DLQ | Schema validation failure | Fix schema or event payload; replay from DLQ |
+
+## Replay from DLQ
+
+```bash
+# Inspect poison messages
+docker compose exec redpanda rpk topic consume orders.events.dlq --num 5
+
+# After fixing the root cause, re-publish manually
+docker compose exec redpanda rpk topic produce orders.events \
+  --format '%v\n' < replay-message.json
+```
+
+## Demo script: failure and recovery
+
+For interviews, this sequence demonstrates resilience:
+
+```bash
+# 1. Create an order (note the order_id)
+curl -X POST http://localhost:8080/api/orders -H 'Content-Type: application/json' \
+  -d '{"user_id":"660e8400-e29b-41d4-a716-446655440001","items":[{"product_id":"prod-001","qty":1,"price_cents":999}]}'
+
+# 2. Kill the processor
+docker compose stop event-processor
+
+# 3. Create more orders (they queue in Redpanda)
+# ... repeat curl ...
+
+# 4. Check lag (should be > 0)
+docker compose exec redpanda rpk group describe event-processor
+
+# 5. Restart processor — lag drains to zero
+docker compose start event-processor
+sleep 5
+docker compose exec redpanda rpk group describe event-processor
+```

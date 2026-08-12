@@ -1,0 +1,69 @@
+---
+sidebar_position: 4
+---
+
+# Caching
+
+StreamShop uses **Redis 7** as an in-memory cache. Redis is never used as a primary datastore — this keeps the durable vs ephemeral storage story clear.
+
+## Patterns
+
+### Cache-aside (catalog-api)
+
+Product list and detail endpoints use cache-aside:
+
+1. Read from Redis
+2. On miss, read from MongoDB
+3. Write result to Redis with TTL (60 seconds)
+
+```mermaid
+sequenceDiagram
+  participant Client
+  participant Catalog
+  participant Redis
+  participant Mongo
+
+  Client->>Catalog: GET /products
+  Catalog->>Redis: GET catalog:products
+  alt cache hit
+    Redis-->>Catalog: cached JSON
+  else cache miss
+    Catalog->>Mongo: find products
+    Mongo-->>Catalog: documents
+    Catalog->>Redis: SET catalog:products EX 60
+  end
+  Catalog-->>Client: 200 JSON
+```
+
+### Idempotency keys (order-api)
+
+Order creation accepts an `Idempotency-Key` header. The Go service stores the key in Redis:
+
+```
+SET idempotency:{key} {order_id} NX EX 3600
+```
+
+Duplicate requests within the TTL window return the original order without re-processing.
+
+### Rate limit backing (optional)
+
+Traefik rate limiting can be backed by Redis for distributed counting across gateway instances.
+
+## Key naming convention
+
+| Key pattern | TTL | Purpose |
+|-------------|-----|---------|
+| `catalog:products` | 60s | Product list |
+| `catalog:product:{id}` | 60s | Single product |
+| `idempotency:{key}` | 3600s | Order deduplication |
+
+## Observability
+
+Cache hit ratio is exposed as a Prometheus metric on `catalog-api`:
+
+```
+catalog_cache_hits_total
+catalog_cache_misses_total
+```
+
+Target hit ratio for the product list under normal load: **> 80%**.

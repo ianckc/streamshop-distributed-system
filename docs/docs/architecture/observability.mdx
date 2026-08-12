@@ -1,0 +1,89 @@
+---
+sidebar_position: 8
+---
+
+# Observability
+
+Observability is a key differentiator for this portfolio project. StreamShop implements the three pillars — **traces**, **metrics**, and **logs** — across all services.
+
+## Stack
+
+| Tool | Role |
+|------|------|
+| OpenTelemetry SDK | Instrumentation in every service |
+| OTel Collector | Receives OTLP, exports to backends |
+| Jaeger | Distributed trace storage and UI |
+| Prometheus | Metrics scraping and storage |
+| Grafana | Dashboards |
+
+All observability services run under the `observability` Compose profile.
+
+## Distributed tracing
+
+Every HTTP request and Kafka message gets a trace span. Context is propagated via W3C `traceparent` headers.
+
+```mermaid
+sequenceDiagram
+  participant Traefik
+  participant OrderAPI
+  participant Redpanda
+  participant Processor
+
+  Traefik->>OrderAPI: POST /orders (trace-id: abc)
+  OrderAPI->>Redpanda: publish event (trace-id: abc)
+  Redpanda->>Processor: consume event (trace-id: abc)
+  Processor-->>Jaeger: span: process_order
+  OrderAPI-->>Jaeger: span: create_order
+  Traefik-->>Jaeger: span: gateway_route
+```
+
+View traces at `http://localhost:16686` (Jaeger UI).
+
+## Metrics
+
+Each service exposes a `/metrics` endpoint in Prometheus format.
+
+### Key metrics
+
+| Metric | Service | Description |
+|--------|---------|-------------|
+| `http_request_duration_seconds` | All | Request latency histogram |
+| `catalog_cache_hits_total` | catalog-api | Redis cache hit count |
+| `orders_created_total` | order-api | Orders created counter |
+| `kafka_consumer_lag` | event-processor | Messages behind latest offset |
+| `clickhouse_rows_inserted_total` | event-processor | OLAP rows written |
+
+## Grafana dashboards
+
+Pre-built dashboards cover:
+
+- Request rate and p95 latency per service
+- Kafka consumer lag
+- Cache hit ratio
+- ClickHouse insert throughput
+
+Access Grafana at `http://localhost:3000` (admin/admin in local dev).
+
+## Structured logging
+
+All services emit JSON logs to stdout:
+
+```json
+{
+  "level": "info",
+  "msg": "order created",
+  "order_id": "550e8400-e29b-41d4-a716-446655440000",
+  "trace_id": "abc123",
+  "service": "order-api"
+}
+```
+
+Docker Compose aggregates logs via `docker compose logs -f {service}`.
+
+## Compose profile
+
+```bash
+docker compose --profile observability up -d
+```
+
+This starts: `otel-collector`, `jaeger`, `prometheus`, `grafana`.

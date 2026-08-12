@@ -1,0 +1,74 @@
+---
+sidebar_position: 3
+---
+
+# Add a Catalog Replica
+
+Use this runbook to scale `catalog-api` horizontally behind nginx.
+
+## When to use
+
+- Demonstrating load balancing in an interview
+- Load testing the catalog read path
+- Showing zero-downtime scaling
+
+## Current setup
+
+By default, two `catalog-api` replicas run:
+
+- `catalog-api-1`
+- `catalog-api-2`
+
+nginx distributes requests using `least_conn` across both.
+
+## Add a third replica
+
+### 1. Scale in Compose
+
+```bash
+docker compose up -d --scale catalog-api=3
+```
+
+### 2. Update nginx upstream
+
+Edit `infra/nginx/catalog-upstream.conf` to add the new upstream:
+
+```nginx
+upstream catalog {
+    least_conn;
+    server catalog-api-1:3001;
+    server catalog-api-2:3001;
+    server catalog-api-3:3001;
+}
+```
+
+Reload nginx:
+
+```bash
+docker compose exec nginx nginx -s reload
+```
+
+### 3. Verify distribution
+
+```bash
+for i in $(seq 1 12); do
+  curl -s http://localhost:8080/api/catalog/products \
+    -H 'X-Debug: true' | jq -r .replica_id
+done
+```
+
+You should see three distinct replica IDs.
+
+## Remove a replica
+
+```bash
+docker compose up -d --scale catalog-api=2
+```
+
+Remove the extra upstream from nginx config and reload.
+
+## Notes
+
+- Replicas are stateless — no session affinity required
+- Redis cache is shared across replicas (cache-aside still works)
+- MongoDB connection pool per replica — watch connection count if scaling beyond 3

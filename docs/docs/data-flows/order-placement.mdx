@@ -1,0 +1,98 @@
+---
+sidebar_position: 1
+---
+
+# Order Placement
+
+This page walks through the complete order placement flow — from HTTP request to OLAP row — including async processing and analytics availability.
+
+## Sequence diagram
+
+```mermaid
+sequenceDiagram
+  participant Client
+  participant Traefik
+  participant OrderAPI as order-api_Go
+  participant Postgres
+  participant Redpanda
+  participant Processor as event-processor_Rust
+  participant ClickHouse
+  participant AnalyticsAPI as analytics-api_Python
+
+  Client->>Traefik: POST /api/orders
+  Traefik->>OrderAPI: forward request
+  OrderAPI->>Postgres: BEGIN; INSERT order + items
+  Postgres-->>OrderAPI: committed
+  OrderAPI->>Redpanda: publish order.created
+  OrderAPI-->>Client: 201 Created {order_id}
+
+  Redpanda->>Processor: deliver order.created
+  Processor->>Processor: validate JSON schema
+  Processor->>ClickHouse: INSERT order_events
+  Processor->>Postgres: UPDATE orders SET status = processed
+  Processor->>Redpanda: commit offset
+
+  Client->>Traefik: GET /api/analytics/orders/summary
+  Traefik->>AnalyticsAPI: forward request
+  AnalyticsAPI->>ClickHouse: SELECT aggregates
+  ClickHouse-->>AnalyticsAPI: rows
+  AnalyticsAPI-->>Client: 200 JSON summary
+```
+
+## Step-by-step
+
+### 1. Client submits order
+
+```bash
+curl -X POST http://localhost:8080/api/orders \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: my-unique-key-123' \
+  -d '{
+    "user_id": "660e8400-e29b-41d4-a716-446655440001",
+    "items": [
+      {"product_id": "prod-001", "qty": 2, "price_cents": 1999}
+    ]
+  }'
+```
+
+### 2. order-api validates and persists
+
+- Validates request body
+- Checks idempotency key in Redis
+- Opens a Postgres transaction
+- Inserts into `orders` and `order_items`
+- Commits transaction
+- Publishes `order.created` event to Redpanda topic `orders.events`
+
+Returns `201 Created` with the new `order_id`.
+
+### 3. event-processor consumes asynchronously
+
+- Reads message from `orders.events`
+- Validates against JSON Schema
+- Inserts denormalized row into ClickHouse `order_events`
+- Updates `orders.status` to `processed` in Postgres
+- Commits Kafka offset
+
+This step is **async** — the client does not wait for it.
+
+### 4. Analytics become available
+
+After processing (typically < 1 second locally):
+
+```bash
+curl http://localhost:8080/api/analytics/orders/summary
+# {"total_orders": 42, "total_revenue_cents": 83958, "period": "last_24h"}
+```
+
+## Failure scenarios
+
+| Failure | Behavior |
+|---------|----------|
+| Postgres unavailable | `503` from order-api; no event published |
+| Redpanda unavailable | Order saved; event published on retry (outbox pattern, Phase 3+) |
+| Processor crash mid-message | Offset not committed; message redelivered on restart |
+| Invalid event schema | Message sent to `orders.events.dlq` after 3 retries |
+| Duplicate request (same idempotency key) | Original order returned; no duplicate created |
+
+See [Runbooks](../runbooks/inspect-kafka-lag) for operational recovery steps.

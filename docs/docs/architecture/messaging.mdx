@@ -1,0 +1,70 @@
+---
+sidebar_position: 5
+---
+
+# Messaging
+
+StreamShop uses **Redpanda** as its message broker — a Kafka-compatible event streaming platform that runs locally with a fraction of Kafka's resource footprint.
+
+## Why Redpanda
+
+| Redpanda | Full Kafka stack |
+|----------|------------------|
+| Single binary, no Zookeeper | Requires Zookeeper or KRaft setup |
+| ~512 MB–1 GB RAM | 2–4 GB+ RAM |
+| Kafka API compatible | Native Kafka API |
+| `rpk` CLI built-in | Separate tooling |
+
+## Topics
+
+| Topic | Purpose |
+|-------|---------|
+| `orders.events` | All order lifecycle events |
+| `orders.events.dlq` | Poison messages after max retries |
+
+## Event schema
+
+Events are validated against a JSON Schema in `schemas/order-created.json`:
+
+```json
+{
+  "event_type": "order.created",
+  "order_id": "550e8400-e29b-41d4-a716-446655440000",
+  "user_id": "660e8400-e29b-41d4-a716-446655440001",
+  "items": [
+    {"product_id": "prod-001", "qty": 2, "price_cents": 1999}
+  ],
+  "total_cents": 3998,
+  "created_at": "2026-08-12T10:00:00Z"
+}
+```
+
+## Producers and consumers
+
+| Role | Service | Client library |
+|------|---------|----------------|
+| Producer | `order-api` (Go) | kafka-go |
+| Consumer | `event-processor` (Rust) | rust-rdkafka |
+
+## Delivery semantics
+
+StreamShop implements **at-least-once delivery**:
+
+1. `order-api` writes to Postgres in a transaction
+2. Publishes to Redpanda after commit
+3. `event-processor` consumes, writes to ClickHouse, then commits offset
+4. On failure, message is retried; after N failures, routed to DLQ
+
+Idempotency keys on the order API and idempotent writes in the processor prevent duplicate side effects.
+
+## Consumer group
+
+```
+Group: event-processor
+Topic: orders.events
+Strategy: range
+```
+
+Scaling to multiple processor instances is done by adding consumers to the same group — Redpanda assigns partitions automatically.
+
+See [ADR: At-least-once delivery](../adr/at-least-once-delivery) for the full rationale.

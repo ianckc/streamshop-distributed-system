@@ -1,0 +1,113 @@
+---
+sidebar_position: 1
+---
+
+# Local Development
+
+This guide covers developing individual services without running the full Docker Compose stack.
+
+## Prerequisites
+
+Install language toolchains for the services you're working on:
+
+| Service | Runtime | Package manager |
+|---------|---------|-----------------|
+| `catalog-api` | Node.js 22 | npm |
+| `order-api` | Go 1.22+ | go modules |
+| `analytics-api` | Python 3.12 | uv or pip |
+| `event-processor` | Rust stable | cargo |
+
+## Environment variables
+
+Copy the example env file for each service:
+
+```bash
+cp services/order-api/.env.example services/order-api/.env
+```
+
+Common variables:
+
+```bash
+# order-api
+DATABASE_URL=postgres://streamshop:streamshop@localhost:5432/streamshop
+KAFKA_BROKERS=localhost:9092
+REDIS_URL=redis://localhost:6379
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+```
+
+## Run infrastructure only
+
+Start just the backing services you need:
+
+```bash
+# Databases and broker
+docker compose up -d postgres redis mongo clickhouse redpanda minio
+
+# Or use the infra profile (when defined)
+docker compose --profile infra up -d
+```
+
+## Run a single service locally
+
+### catalog-api (Node.js)
+
+```bash
+cd services/catalog-api
+npm install
+npm run dev
+```
+
+### order-api (Go)
+
+```bash
+cd services/order-api
+go run ./cmd/server
+```
+
+### analytics-api (Python)
+
+```bash
+cd services/analytics-api
+uv sync
+uv run uvicorn app.main:app --reload --port 3003
+```
+
+### event-processor (Rust)
+
+```bash
+cd services/event-processor
+cargo run
+```
+
+## Integration tests with Testcontainers
+
+Each service can spin up its dependencies in Docker for integration tests:
+
+```go
+// Go example (order-api)
+postgres, _ := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+    ContainerRequest: testcontainers.ContainerRequest{
+        Image: "postgres:16",
+        // ...
+    },
+})
+```
+
+See each service's `README.md` for test commands.
+
+## Docs site development
+
+```bash
+cd docs
+npm install
+npm start        # dev server with hot reload
+npm run build    # production build
+npm run serve    # serve production build locally
+```
+
+## Recommended workflow
+
+1. Start infra containers: `docker compose --profile infra up -d`
+2. Run the service you're editing natively (faster iteration)
+3. Use `./scripts/smoke-test.sh` before committing
+4. Run full stack with `docker compose --profile full up -d` before demos
