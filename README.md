@@ -37,11 +37,17 @@ Open [http://localhost:3000](http://localhost:3000).
 | `analytics-api` | Python | OLAP queries and reporting |
 | `event-processor` | Rust | Async event consumption and enrichment |
 
-## Quick start (coming soon)
+## Quick start
 
 ```bash
-docker compose --profile full up -d
+# Optional: copy and edit Compose defaults
+cp .env.example .env
+
+docker compose up --build order-api
+curl http://localhost:3002/health
 ```
+
+Full stack (`--profile full`) comes later as more services are added.
 
 ## License
 

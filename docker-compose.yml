@@ -1,0 +1,21 @@
+services:
+  order-api:
+    build:
+      context: ./services/order-api
+      dockerfile: Dockerfile
+    container_name: streamshop-order-api
+    ports:
+      - "${ORDER_API_PORT:-3002}:${ORDER_API_PORT:-3002}"
+    env_file:
+      - path: ./services/order-api/.env
+        required: false
+    environment:
+      PORT: ${ORDER_API_PORT:-3002}
+      SERVICE_NAME: ${ORDER_API_SERVICE_NAME:-order-api}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${PORT}/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped

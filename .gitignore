@@ -1,0 +1,11 @@
+# Local env files (keep examples committed)
+.env
+**/.env
+!.env.example
+!**/.env.example
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/

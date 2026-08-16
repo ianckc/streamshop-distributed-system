@@ -12,6 +12,25 @@ go run ./cmd/server
 
 The server listens on `:3002` by default.
 
+## Run with Docker Compose
+
+From the repository root:
+
+```bash
+# Optional: override port / service name
+cp .env.example .env
+
+docker compose up --build order-api
+```
+
+Then:
+
+```bash
+curl http://localhost:${ORDER_API_PORT:-3002}/health
+```
+
+Compose reads root `.env` for host/container port mapping. Optional service overrides live in `services/order-api/.env` (copy from `.env.example`; not required to start).
+
 ## Health check
 
 ```bash
@@ -28,10 +47,15 @@ Expected response:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `3002` | HTTP listen port |
+| `PORT` | `3002` | HTTP listen port (inside the process / container) |
 | `SERVICE_NAME` | `order-api` | Included in health response |
 
-Copy `.env.example` to `.env` if you use a tool that loads env files locally.
+| Compose variable (root `.env`) | Default | Description |
+|--------------------------------|---------|-------------|
+| `ORDER_API_PORT` | `3002` | Published and container port |
+| `ORDER_API_SERVICE_NAME` | `order-api` | Sets `SERVICE_NAME` in the container |
+
+For local `go run`, copy `services/order-api/.env.example` to `services/order-api/.env`.
 
 ## Project layout
 
