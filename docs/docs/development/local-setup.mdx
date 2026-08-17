@@ -9,7 +9,7 @@ sidebar_position: 1
 | Service | Runtime | Status |
 |---------|---------|--------|
 | `order-api` | Go 1.26+ | **Built** |
-| `catalog-api` | Node.js 22 + TypeScript | **Built** (health + list) |
+| `catalog-api` | Node.js 22 + TypeScript | **Built** (health + Mongo list) |
 | `analytics-api` | Python 3.12 | Planned |
 | `event-processor` | Rust stable | Planned |
 
@@ -17,7 +17,7 @@ sidebar_position: 1
 
 ### With Docker Compose
 
-From the repo root — starts Traefik, Postgres, order-api, and catalog-api:
+From the repo root — starts Traefik, Postgres, Mongo, order-api, and catalog-api:
 
 ```bash
 docker compose up --build
@@ -51,14 +51,17 @@ See [order-api](../services/order-api) for endpoints and configuration.
 
 Included in `docker compose up --build`. Health: `http://localhost:3001/health`. Product list: `http://localhost:8080/api/catalog/products`.
 
-### App locally
+### App locally, Mongo in Docker
 
 ```bash
+docker compose up -d mongo
 cd services/catalog-api
 cp .env.example .env
 npm install
 npm start
 ```
+
+`MONGODB_URI` in `.env.example` points at `localhost:27017`.
 
 ### Tests
 
@@ -80,6 +83,16 @@ DATABASE_URL=postgres://streamshop:streamshop@localhost:5432/streamshop?sslmode=
 Copy from `services/order-api/.env.example`. `DATABASE_URL` is **required**.
 
 Future variables (not used yet): `KAFKA_BROKERS`, `REDIS_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT`.
+
+## Environment variables (catalog-api)
+
+```bash
+PORT=3001
+SERVICE_NAME=catalog-api
+MONGODB_URI=mongodb://localhost:27017/streamshop
+```
+
+Copy from `services/catalog-api/.env.example`. `MONGODB_URI` is **required**.
 
 ## Other services (planned)
 
@@ -104,7 +117,7 @@ npm start
 
 ## Integration tests (planned)
 
-Handler tests today use a fake store (no database). Postgres integration tests with Testcontainers are planned:
+Handler tests today use a fake store (no database). Postgres and Mongo integration tests with Testcontainers are planned:
 
 ```go
 // Future example

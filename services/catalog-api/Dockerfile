@@ -19,6 +19,7 @@ COPY --from=builder /app/dist ./dist
 
 ENV PORT=3001
 ENV SERVICE_NAME=catalog-api
+# MONGODB_URI is provided by Compose at runtime
 EXPOSE 3001
 
 USER node

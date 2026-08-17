@@ -16,7 +16,7 @@ Options considered:
 
 ## Decision
 
-Use **MongoDB 7** for the product catalog.
+Use **MongoDB 8** for the product catalog.
 
 ## Rationale
 

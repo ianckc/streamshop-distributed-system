@@ -11,7 +11,7 @@ StreamShop uses four distinct storage technologies, each chosen for a specific a
 | Store | Type | Technology | Primary data |
 |-------|------|------------|--------------|
 | PostgreSQL | SQL (OLTP) | PostgreSQL 18 | Orders, order items |
-| MongoDB | NoSQL | MongoDB 7 | Product catalog (flexible schema) |
+| MongoDB | NoSQL | MongoDB 8 | Product catalog (flexible schema) |
 | ClickHouse | OLAP | ClickHouse 24 | Order event facts, aggregates |
 | MinIO | Object | MinIO (S3-compatible) | Product images, CSV exports |
 | Redis | Cache | Redis 7 | Hot reads, idempotency keys |
@@ -56,7 +56,9 @@ Document store for the product catalog. Products have variable attributes — co
 }
 ```
 
-**Accessed by:** `catalog-api` (read/write)
+**Accessed by:** `catalog-api` (reads the product list today; writes planned)
+
+Seed documents live in `infra/mongo/seed.js` and load on first start of an empty volume.
 
 ## ClickHouse (OLAP)
 
