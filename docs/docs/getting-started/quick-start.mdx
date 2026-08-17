@@ -22,7 +22,8 @@ sidebar_position: 1
 | Redis 8 | Cache-aside for catalog list/detail (TTL 60s) |
 | Redis Insight | Local GUI on `:5540` (not behind Traefik) |
 | MinIO | Presigned `image_url` on catalog list/detail |
-| Kafka, analytics, observability | Not yet |
+| Redpanda | Kafka API `:19092`; produce planned |
+| Analytics, observability | Not yet |
 
 ## Run the stack
 
@@ -33,7 +34,7 @@ cp .env.example .env   # optional — defaults work out of the box
 docker compose up --build
 ```
 
-This starts **Traefik**, **nginx**, **postgres**, **mongo**, **redis**, **redisinsight**, **minio**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Place orders and list products through the gateway on **:8080**; health and debug calls can still hit **:3001** / **:3011** / **:3002** directly. Redis Insight is on **:5540**. MinIO console is on **:9001**.
+This starts **Traefik**, **nginx**, **postgres**, **mongo**, **redis**, **redisinsight**, **minio**, **redpanda**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Place orders and list products through the gateway on **:8080**; health and debug calls can still hit **:3001** / **:3011** / **:3002** directly. Redis Insight is on **:5540**. MinIO console is on **:9001**. Redpanda Kafka API is on **:19092**.
 
 ### Health checks (direct)
 
@@ -94,7 +95,7 @@ Opens at [http://localhost:3000](http://localhost:3000).
 
 ## Coming later
 
-The full StreamShop vision adds catalog cache-aside, Redpanda, ClickHouse, and observability. Compose profiles (`minimal`, `full`) will be added as those services land. See [PLAN.md](https://github.com/ianckc/distributed-systems/blob/main/PLAN.md).
+The full StreamShop vision adds `order.created` produce/consume, ClickHouse, and observability. Compose profiles (`minimal`, `full`) will be added as those services land. See [PLAN.md](https://github.com/ianckc/distributed-systems/blob/main/PLAN.md).
 
 Planned example calls (via Traefik):
 

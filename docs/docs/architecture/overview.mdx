@@ -25,6 +25,7 @@ flowchart LR
   Catalog1 --> MinIO[(MinIO)]
   Catalog2 --> MinIO
   OrderAPI --> Postgres[(PostgreSQL_18)]
+  Redpanda[Redpanda]
 ```
 
 - **Traefik** on `:8080` — `/api/orders` → order-api, `/api/catalog` → nginx → catalog replicas; dashboard on `:8081`
@@ -36,7 +37,7 @@ flowchart LR
 - **Redis** — cache-aside for catalog list/detail (TTL 60s; fail-open)
 - **Redis Insight** on `:5540` — local GUI; not behind Traefik
 - **MinIO** — S3 API `:9000`, console `:9001`; buckets `product-images` and `exports`; catalog-api returns presigned `image_url` on product reads (upload via API is planned)
-- No queue or other services yet
+- **Redpanda** v26.2.1 — Kafka API `:19092` (host), `redpanda:9092` (Compose); no producer yet
 
 Details: [catalog-api](../services/catalog-api), [order-api](../services/order-api), [Quick Start](../getting-started/quick-start).
 
@@ -108,7 +109,7 @@ Docker Compose with optional profiles:
 - **`minimal`** — gateway, core services, Postgres, Redis *(not yet defined)*
 - **`full`** — all databases, Redpanda, MinIO, observability *(not yet defined)*
 
-Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisinsight, minio, order-api, catalog-api-1, and catalog-api-2.
+Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisinsight, minio, redpanda, order-api, catalog-api-1, and catalog-api-2.
 
 ## Service responsibilities (target)
 
@@ -130,7 +131,7 @@ Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisins
 | API Gateway | Traefik v3 | [API Gateway](./api-gateway) | **Built** (`/api/orders`, `/api/catalog`) |
 | Load Balancer | nginx | [Load Balancing](./load-balancing) | **Built** (2× catalog-api) |
 | Cache | Redis 8 | [Caching](./caching) | **Built** (cache-aside, 60s TTL) |
-| Message Queue | Redpanda | [Messaging](./messaging) | Planned |
+| Message Queue | Redpanda | [Messaging](./messaging) | **Built** (broker only; produce planned) |
 | SQL (OLTP) | PostgreSQL 18 | [Storage](./storage) | **Built** |
 | NoSQL | MongoDB 8 | [Storage](./storage) | **Built** |
 | OLAP | ClickHouse 24 | [Storage](./storage) | Planned |

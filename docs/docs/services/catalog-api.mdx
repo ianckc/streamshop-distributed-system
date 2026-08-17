@@ -40,7 +40,7 @@ cp .env.example .env   # optional
 docker compose up --build
 ```
 
-Starts **Traefik**, **nginx**, **mongo**, **redis**, **redisinsight**, **minio**, **postgres**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Health/ready: `http://localhost:3001/health` (replica 1) and `http://localhost:3011/health` (replica 2). Products via Traefik → nginx: `http://localhost:8080/api/catalog/products`.
+Starts **Traefik**, **nginx**, **mongo**, **redis**, **redisinsight**, **minio**, **redpanda**, **postgres**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Health/ready: `http://localhost:3001/health` (replica 1) and `http://localhost:3011/health` (replica 2). Products via Traefik → nginx: `http://localhost:8080/api/catalog/products`.
 
 ## Endpoints
 

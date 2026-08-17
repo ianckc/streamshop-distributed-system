@@ -17,7 +17,7 @@ sidebar_position: 1
 
 ### With Docker Compose
 
-From the repo root — starts Traefik, nginx, Postgres, Mongo, Redis, Redis Insight, MinIO, order-api, and two catalog-api replicas:
+From the repo root — starts Traefik, nginx, Postgres, Mongo, Redis, Redis Insight, MinIO, Redpanda, order-api, and two catalog-api replicas:
 
 ```bash
 docker compose up --build
@@ -103,13 +103,13 @@ S3_REGION=us-east-1
 
 Copy from `services/catalog-api/.env.example`. `MONGODB_URI`, `REDIS_URL`, and `S3_ENDPOINT` / keys / bucket are **required**.
 
-## Other services (planned)
+## Other services
 
-When added, the pattern will be:
+Redpanda is in Compose (Kafka API `localhost:19092`). ClickHouse is still planned.
 
 ```bash
 # Start backing services only
-docker compose up -d postgres redis mongo clickhouse redpanda minio
+docker compose up -d postgres redis mongo minio redpanda
 
 # Run one service natively for fast iteration
 cd services/catalog-api && npm start

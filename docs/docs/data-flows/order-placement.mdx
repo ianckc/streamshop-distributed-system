@@ -44,7 +44,7 @@ What happens:
 3. Order + line items inserted in one Postgres transaction
 4. `201` response with order JSON (`status: "pending"`)
 
-Not implemented yet: idempotency keys, Redpanda, async processor, analytics.
+Not implemented yet: idempotency keys, event publish, async processor, analytics. Redpanda itself is in Compose.
 
 Full API details: [order-api](../services/order-api).
 
@@ -86,7 +86,7 @@ sequenceDiagram
 ### Planned steps after order creation
 
 - **Idempotency** — `Idempotency-Key` header + Redis *(not built)*
-- **Event publish** — `order.created` to Redpanda topic `orders.events` *(not built)*
+- **Event publish** — `order.created` to Redpanda topic `orders.events` *(broker is in Compose; produce not built)*
 - **Async processing** — Rust consumer → ClickHouse + status update *(not built)*
 - **Analytics** — `GET /api/analytics/orders/summary` via Traefik *(not built)*
 
