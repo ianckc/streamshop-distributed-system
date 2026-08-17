@@ -16,35 +16,35 @@ Use this runbook to scale `catalog-api` horizontally behind nginx.
 
 By default, two `catalog-api` replicas run:
 
-- `catalog-api-1`
-- `catalog-api-2`
+- `catalog-api-1` — host port `3001`
+- `catalog-api-2` — host port `3011`
 
-nginx distributes requests using `least_conn` across both.
+nginx distributes requests with **round_robin** across both. Traefik sends `/api/catalog` to nginx, not to a replica.
+
+Upstream hostnames are **static** in `infra/nginx/catalog-upstream.conf`. `docker compose --scale` is not enough — nginx will not discover a new replica until you add it to that file.
 
 ## Add a third replica
 
-### 1. Scale in Compose
+### 1. Add a Compose service
 
-```bash
-docker compose up -d --scale catalog-api=3
-```
+Copy `catalog-api-2` to `catalog-api-3` in `docker-compose.yml`. Give it a unique host port (for example `3012`) and `SERVICE_NAME: catalog-api-3`.
 
 ### 2. Update nginx upstream
 
-Edit `infra/nginx/catalog-upstream.conf` to add the new upstream:
+Edit `infra/nginx/catalog-upstream.conf`:
 
 ```nginx
 upstream catalog {
-    least_conn;
-    server catalog-api-1:3001;
-    server catalog-api-2:3001;
-    server catalog-api-3:3001;
+    server catalog-api-1:3001 max_fails=3 fail_timeout=30s;
+    server catalog-api-2:3001 max_fails=3 fail_timeout=30s;
+    server catalog-api-3:3001 max_fails=3 fail_timeout=30s;
 }
 ```
 
-Reload nginx:
+Reload nginx (or recreate the container if the bind-mounted file is already picked up on reload):
 
 ```bash
+docker compose up -d catalog-api-3
 docker compose exec nginx nginx -s reload
 ```
 
@@ -52,23 +52,19 @@ docker compose exec nginx nginx -s reload
 
 ```bash
 for i in $(seq 1 12); do
-  curl -s http://localhost:8080/api/catalog/products \
-    -H 'X-Debug: true' | jq -r .replica_id
+  curl -sI http://localhost:8080/api/catalog/products | grep -i x-replica-id
 done
 ```
 
-You should see three distinct replica IDs.
+You should see three replica IDs.
 
 ## Remove a replica
 
-```bash
-docker compose up -d --scale catalog-api=2
-```
-
-Remove the extra upstream from nginx config and reload.
+Stop and remove the extra service, delete it from `docker-compose.yml` and from the nginx upstream, then reload nginx.
 
 ## Notes
 
 - Replicas are stateless — no session affinity required
 - Redis cache is shared across replicas (cache-aside still works)
 - MongoDB connection pool per replica — watch connection count if scaling beyond 3
+- OSS nginx uses passive `max_fails`; Compose still healthchecks `/health` on each replica

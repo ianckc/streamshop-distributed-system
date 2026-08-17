@@ -35,6 +35,10 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     options.serviceName ?? process.env.SERVICE_NAME ?? "catalog-api";
   const app = Fastify({ logger: options.logger ?? true });
 
+  app.addHook("onSend", async (_request, reply) => {
+    void reply.header("x-replica-id", serviceName);
+  });
+
   app.get(
     "/health",
     async (): Promise<HealthResponse> => ({

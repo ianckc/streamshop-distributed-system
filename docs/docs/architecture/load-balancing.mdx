@@ -6,32 +6,42 @@ sidebar_position: 3
 
 StreamShop demonstrates **two layers** of load balancing that employers will recognize in production systems.
 
+## What's running today
+
+```mermaid
+flowchart LR
+  Client[Client] --> Traefik[Traefik]
+  Traefik -->|PathPrefix /api/catalog| Nginx[nginx]
+  Traefik -->|PathPrefix /api/orders| OrderAPI[order-api]
+  Nginx --> Catalog1[catalog-api-1]
+  Nginx --> Catalog2[catalog-api-2]
+```
+
+- **Traefik** on `:8080` is the edge gateway
+- **nginx** load-balances `/api/catalog` to two catalog-api replicas (`round_robin`)
+- Replicas are also on **:3001** (`catalog-api-1`) and **:3011** (`catalog-api-2`) for health/debug
+- Redis is shared — cache-aside still works across replicas
+
+OSS nginx has **passive** upstream checks (`max_fails` / `fail_timeout` / `proxy_next_upstream`). Each replica still has a Compose healthcheck on `/health`. Active `/health` probes would need nginx Plus.
+
 ## Layer 1: Traefik (edge gateway)
 
-Traefik routes incoming requests to the correct service based on path prefix. It handles TLS termination, global middleware, and the external-facing entrypoint at `localhost:8080`.
+Traefik routes incoming requests to the correct service based on path prefix. It handles TLS termination, global middleware, and the external-facing entrypoint at `localhost:8080`. Catalog traffic is forwarded to **nginx**, not to a replica directly.
 
 ## Layer 2: nginx (internal)
 
 An **nginx** instance load-balances across **two replicas** of `catalog-api`. The catalog is read-heavy and cache-friendly — a natural candidate for horizontal scaling.
 
-### Upstream config
+Config lives in `infra/nginx/catalog-upstream.conf` and `infra/nginx/nginx.conf`.
 
 ```nginx
 upstream catalog {
-    least_conn;
     server catalog-api-1:3001 max_fails=3 fail_timeout=30s;
     server catalog-api-2:3001 max_fails=3 fail_timeout=30s;
 }
-
-server {
-    location / {
-        proxy_pass http://catalog;
-        proxy_next_upstream error timeout http_502 http_503;
-    }
-}
 ```
 
-Health checks hit `/health` on each replica. Unhealthy upstreams are removed automatically.
+`round_robin` is the nginx default (no `least_conn`). Sequential curls then alternate replicas, which is the demo you want. `least_conn` is a better production default under concurrent load.
 
 ## Why only catalog is replicated
 
@@ -47,10 +57,18 @@ Replicating everything locally would consume unnecessary RAM. The docs explain w
 ## Demo: verify load balancing
 
 ```bash
-# Repeat several times — responses should alternate between replica IDs
-for i in $(seq 1 10); do
-  curl -s http://localhost:8080/api/catalog/products | jq .replica_id
+for i in $(seq 1 8); do
+  curl -sI http://localhost:8080/api/catalog/products | grep -i x-replica-id
 done
+```
+
+You should see `catalog-api-1` and `catalog-api-2`. nginx also sets `x-upstream` to the chosen backend address.
+
+Hit a replica directly:
+
+```bash
+curl http://localhost:3001/health   # catalog-api-1
+curl http://localhost:3011/health   # catalog-api-2
 ```
 
 See the [add catalog replica runbook](../runbooks/add-catalog-replica) for scaling instructions.

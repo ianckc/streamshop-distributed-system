@@ -17,7 +17,7 @@ sidebar_position: 1
 
 ### With Docker Compose
 
-From the repo root — starts Traefik, Postgres, Mongo, Redis, Redis Insight, order-api, and catalog-api:
+From the repo root — starts Traefik, nginx, Postgres, Mongo, Redis, Redis Insight, order-api, and two catalog-api replicas:
 
 ```bash
 docker compose up --build
@@ -49,7 +49,7 @@ See [order-api](../services/order-api) for endpoints and configuration.
 
 ### With Docker Compose
 
-Included in `docker compose up --build`. Health: `http://localhost:3001/health`. Ready: `http://localhost:3001/ready`. Products: `http://localhost:8080/api/catalog/products` and `http://localhost:8080/api/catalog/products/prod-001`.
+Included in `docker compose up --build`. Replica 1: `http://localhost:3001/health`. Replica 2: `http://localhost:3011/health`. Products via Traefik → nginx: `http://localhost:8080/api/catalog/products`.
 
 ### App locally, Mongo and Redis in Docker
 

@@ -17,7 +17,7 @@ Node.js HTTP service for the product catalog.
 | MongoDB persistence | Implemented |
 | Redis cache-aside | Implemented (60s TTL; fail-open) |
 | MinIO image upload | Planned |
-| Nginx replicas | Planned |
+| Nginx replicas | Implemented (2 behind nginx, round_robin) |
 
 ## Stack
 
@@ -27,7 +27,7 @@ Node.js HTTP service for the product catalog.
 | HTTP | Fastify 5 |
 | Database | MongoDB 8 via official driver |
 | Cache | Redis 8, cache-aside |
-| Port | `3001` (default) |
+| Port | `3001` (replica 1; replica 2 is `3011`) |
 
 ## Run with Docker Compose
 
@@ -38,7 +38,7 @@ cp .env.example .env   # optional
 docker compose up --build
 ```
 
-Starts **Traefik**, **mongo**, **redis**, **redisinsight**, **postgres**, **order-api**, and **catalog-api**. Health/ready: `http://localhost:3001/health` and `http://localhost:3001/ready`. Products: `http://localhost:8080/api/catalog/products` and `http://localhost:8080/api/catalog/products/prod-001`.
+Starts **Traefik**, **nginx**, **mongo**, **redis**, **redisinsight**, **postgres**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Health/ready: `http://localhost:3001/health` (replica 1) and `http://localhost:3011/health` (replica 2). Products via Traefik → nginx: `http://localhost:8080/api/catalog/products`.
 
 ## Endpoints
 
@@ -51,8 +51,10 @@ curl http://localhost:3001/health
 ```
 
 ```json
-{"status":"ok","service":"catalog-api"}
+{"status":"ok","service":"catalog-api-1"}
 ```
+
+Replica 2 is the same on `:3011` with `"service":"catalog-api-2"`. Every response also has `x-replica-id`.
 
 ### `GET /ready`
 
@@ -63,14 +65,14 @@ curl http://localhost:3001/ready
 ```
 
 ```json
-{"status":"ok","service":"catalog-api"}
+{"status":"ok","service":"catalog-api-1"}
 ```
 
 Mongo unavailable → `503` `{"error":"not ready"}`.
 
 ### `GET /api/catalog/products`
 
-Returns the product catalog from MongoDB (`products` collection), with Redis cache-aside (`catalog:products`, TTL 60s). Amounts are in **pence**. First request after a miss sets `x-cache: miss`; the next request within the TTL is `x-cache: hit`. Redis unavailable → serve Mongo and still return 200 (`x-cache: miss`). `/ready` still pings Mongo only.
+Returns the product catalog from MongoDB (`products` collection), with Redis cache-aside (`catalog:products`, TTL 60s). Amounts are in **pence**. First request after a miss sets `x-cache: miss`; the next request within the TTL is `x-cache: hit`. Traefik → nginx round-robins replicas; `x-replica-id` shows which one served the request. Redis unavailable → serve Mongo and still return 200 (`x-cache: miss`). `/ready` still pings Mongo only.
 
 ```bash
 curl http://localhost:8080/api/catalog/products
@@ -137,7 +139,7 @@ Redis Insight (local GUI, not behind Traefik): [http://localhost:5540](http://lo
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3001` | HTTP listen port |
-| `SERVICE_NAME` | `catalog-api` | Shown in health response |
+| `SERVICE_NAME` | `catalog-api` | Shown in health/ready JSON and `x-replica-id` (Compose uses `catalog-api-1` / `catalog-api-2`) |
 | `MONGODB_URI` | *(required)* | MongoDB connection string |
 | `REDIS_URL` | *(required)* | Redis connection string |
 

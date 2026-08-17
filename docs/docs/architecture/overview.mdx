@@ -11,17 +11,23 @@ StreamShop is an event-driven commerce and analytics platform. The **target** ar
 ```mermaid
 flowchart LR
   Client[Client] --> Traefik[Traefik]
-  Client --> CatalogAPI[catalog-api]
+  Client --> Catalog1[catalog-api-1]
+  Client --> Catalog2[catalog-api-2]
   Client --> OrderAPI[order-api]
-  Traefik --> CatalogAPI
+  Traefik --> Nginx[nginx]
   Traefik --> OrderAPI
-  CatalogAPI --> Mongo[(MongoDB_8)]
-  CatalogAPI --> Redis[(Redis_8)]
+  Nginx --> Catalog1
+  Nginx --> Catalog2
+  Catalog1 --> Mongo[(MongoDB_8)]
+  Catalog2 --> Mongo
+  Catalog1 --> Redis[(Redis_8)]
+  Catalog2 --> Redis
   OrderAPI --> Postgres[(PostgreSQL_18)]
 ```
 
-- **Traefik** on `:8080` — `/api/orders` → order-api, `/api/catalog` → catalog-api; dashboard on `:8081`
-- **catalog-api** on `:3001` — `GET /health`, `GET /ready`, `GET /api/catalog/products`, `GET /api/catalog/products/:id` (also reachable directly)
+- **Traefik** on `:8080` — `/api/orders` → order-api, `/api/catalog` → nginx → catalog replicas; dashboard on `:8081`
+- **nginx** — round_robin across `catalog-api-1` and `catalog-api-2`
+- **catalog-api** — replica 1 on `:3001`, replica 2 on `:3011` (`GET /health`, `GET /ready`, product list/detail)
 - **order-api** on `:3002` — `GET /health`, `GET /ready`, `POST /api/orders` (also reachable directly)
 - **PostgreSQL** — `orders` and `order_items` tables
 - **MongoDB** — `products` collection
@@ -99,7 +105,7 @@ Docker Compose with optional profiles:
 - **`minimal`** — gateway, core services, Postgres, Redis *(not yet defined)*
 - **`full`** — all databases, Redpanda, MinIO, observability *(not yet defined)*
 
-Today: `docker compose up` runs Traefik, postgres, mongo, redis, redisinsight, order-api, and catalog-api.
+Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisinsight, order-api, catalog-api-1, and catalog-api-2.
 
 ## Service responsibilities (target)
 
@@ -110,7 +116,7 @@ Today: `docker compose up` runs Traefik, postgres, mongo, redis, redisinsight, o
 | `event-processor` | ClickHouse, PostgreSQL (status) | Redpanda |
 | `analytics-api` | — (read-only) | ClickHouse, PostgreSQL |
 
-**catalog-api today:** `GET /health`, `GET /ready` (Mongo ping), `GET /api/catalog/products`, and `GET /api/catalog/products/:id` with Redis cache-aside; MinIO is not wired yet.
+**catalog-api today:** two replicas behind nginx; `GET /health`, `GET /ready` (Mongo ping), `GET /api/catalog/products`, and `GET /api/catalog/products/:id` with Redis cache-aside; MinIO is not wired yet.
 
 **order-api today:** writes to PostgreSQL only; exposes `GET /health`, `GET /ready` (Postgres ping), and `POST /api/orders` (no tracing or metrics yet).
 
@@ -119,7 +125,7 @@ Today: `docker compose up` runs Traefik, postgres, mongo, redis, redisinsight, o
 | Component | Technology | Doc | Status |
 |-----------|------------|-----|--------|
 | API Gateway | Traefik v3 | [API Gateway](./api-gateway) | **Built** (`/api/orders`, `/api/catalog`) |
-| Load Balancer | nginx | [Load Balancing](./load-balancing) | Planned |
+| Load Balancer | nginx | [Load Balancing](./load-balancing) | **Built** (2× catalog-api) |
 | Cache | Redis 8 | [Caching](./caching) | **Built** (cache-aside, 60s TTL) |
 | Message Queue | Redpanda | [Messaging](./messaging) | Planned |
 | SQL (OLTP) | PostgreSQL 18 | [Storage](./storage) | **Built** |

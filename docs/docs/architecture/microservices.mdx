@@ -10,14 +10,14 @@ StreamShop is polyglot by design — each language handles a role that fits its 
 
 | Service | Language | Framework | Port | Replicas | Status |
 |---------|----------|-----------|------|----------|--------|
-| `catalog-api` | Node.js 22 + TypeScript | Fastify | 3001 | 2 | **Built** (health + Mongo list/detail + Redis cache) |
+| `catalog-api` | Node.js 22 + TypeScript | Fastify | 3001 / 3011 | 2 | **Built** (nginx + Redis cache) |
 | `order-api` | Go 1.26 | stdlib `net/http` | 3002 | 1 | **Built** |
 | `analytics-api` | Python 3.12 | FastAPI | 3003 | 1 | Planned |
 | `event-processor` | Rust | Axum + rdkafka | 3004 | 1 | Planned |
 
 ## catalog-api (Node.js + TypeScript)
 
-**Status:** **Implemented** (health + Mongo product list/detail + Redis cache-aside).
+**Status:** **Implemented** (2 replicas behind nginx; health + Mongo product list/detail + Redis cache-aside).
 
 **Responsibility:** Product reads, Redis cache-aside; image upload URLs planned.
 
