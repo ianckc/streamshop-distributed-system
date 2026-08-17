@@ -78,6 +78,7 @@ const config: Config = {
           items: [
             {label: 'Introduction', to: '/docs/intro'},
             {label: 'Quick Start', to: '/docs/getting-started/quick-start'},
+            {label: 'order-api', to: '/docs/services/order-api'},
             {label: 'Architecture', to: '/docs/architecture/overview'},
           ],
         },

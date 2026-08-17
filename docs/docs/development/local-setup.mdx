@@ -4,110 +4,90 @@ sidebar_position: 1
 
 # Local Development
 
-This guide covers developing individual services without running the full Docker Compose stack.
-
 ## Prerequisites
 
-Install language toolchains for the services you're working on:
+| Service | Runtime | Status |
+|---------|---------|--------|
+| `order-api` | Go 1.26+ | **Built** |
+| `catalog-api` | Node.js 22 | Planned |
+| `analytics-api` | Python 3.12 | Planned |
+| `event-processor` | Rust stable | Planned |
 
-| Service | Runtime | Package manager |
-|---------|---------|-----------------|
-| `catalog-api` | Node.js 22 | npm |
-| `order-api` | Go 1.22+ | go modules |
-| `analytics-api` | Python 3.12 | uv or pip |
-| `event-processor` | Rust stable | cargo |
+## order-api (implemented)
 
-## Environment variables
+### With Docker Compose
 
-Copy the example env file for each service:
+From the repo root — starts Postgres and the API:
 
 ```bash
-cp services/order-api/.env.example services/order-api/.env
+docker compose up --build
 ```
 
-Common variables:
+### App locally, Postgres in Docker
 
 ```bash
-# order-api
-DATABASE_URL=postgres://streamshop:streamshop@localhost:5432/streamshop
-KAFKA_BROKERS=localhost:9092
-REDIS_URL=redis://localhost:6379
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
-```
-
-## Run infrastructure only
-
-Start just the backing services you need:
-
-```bash
-# Databases and broker
-docker compose up -d postgres redis mongo clickhouse redpanda minio
-
-# Or use the infra profile (when defined)
-docker compose --profile infra up -d
-```
-
-## Run a single service locally
-
-### catalog-api (Node.js)
-
-```bash
-cd services/catalog-api
-npm install
-npm run dev
-```
-
-### order-api (Go)
-
-```bash
+docker compose up -d postgres
 cd services/order-api
+cp .env.example .env
 go run ./cmd/server
 ```
 
-### analytics-api (Python)
+`DATABASE_URL` in `.env.example` points at `localhost:5432`.
+
+### Tests
 
 ```bash
-cd services/analytics-api
-uv sync
-uv run uvicorn app.main:app --reload --port 3003
+cd services/order-api
+go test ./...
+go test -coverprofile=coverage.out -coverpkg=./... ./...
+go tool cover -html=coverage.out -o coverage.html
 ```
 
-### event-processor (Rust)
+See [order-api](../services/order-api) for endpoints and configuration.
+
+## Environment variables (order-api)
 
 ```bash
-cd services/event-processor
-cargo run
+PORT=3002
+SERVICE_NAME=order-api
+DATABASE_URL=postgres://streamshop:streamshop@localhost:5432/streamshop?sslmode=disable
 ```
 
-## Integration tests with Testcontainers
+Copy from `services/order-api/.env.example`. `DATABASE_URL` is **required**.
 
-Each service can spin up its dependencies in Docker for integration tests:
+Future variables (not used yet): `KAFKA_BROKERS`, `REDIS_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
-```go
-// Go example (order-api)
-postgres, _ := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-    ContainerRequest: testcontainers.ContainerRequest{
-        Image: "postgres:16",
-        // ...
-    },
-})
+## Other services (planned)
+
+When added, the pattern will be:
+
+```bash
+# Start backing services only
+docker compose up -d postgres redis mongo clickhouse redpanda minio
+
+# Run one service natively for fast iteration
+cd services/catalog-api && npm run dev
+cd services/order-api && go run ./cmd/server
 ```
 
-See each service's `README.md` for test commands.
-
-## Docs site development
+## Docs site
 
 ```bash
 cd docs
 npm install
-npm start        # dev server with hot reload
-npm run build    # production build
-npm run serve    # serve production build locally
+npm start
 ```
 
-## Recommended workflow
+## Integration tests (planned)
 
-1. Start infra containers: `docker compose --profile infra up -d`
-2. Run the service you're editing natively (faster iteration)
-3. Use `./scripts/smoke-test.sh` before committing
-4. Run full stack with `docker compose --profile full up -d` before demos
+Handler tests today use a fake store (no database). Postgres integration tests with Testcontainers are planned:
+
+```go
+// Future example
+postgres, _ := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+    ContainerRequest: testcontainers.ContainerRequest{
+        Image: "postgres:18",
+        // ...
+    },
+})
+```

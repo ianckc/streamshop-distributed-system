@@ -4,9 +4,50 @@ sidebar_position: 1
 
 # Order Placement
 
-This page walks through the complete order placement flow — from HTTP request to OLAP row — including async processing and analytics availability.
+End-to-end order flow from HTTP request to analytics row. **Only the sync Postgres write is implemented today** — the rest is the target design.
 
-## Sequence diagram
+## Implemented today
+
+```mermaid
+sequenceDiagram
+  participant Client
+  participant OrderAPI as order-api_Go
+  participant Postgres
+
+  Client->>OrderAPI: POST /api/orders
+  OrderAPI->>OrderAPI: validate JSON
+  OrderAPI->>Postgres: BEGIN transaction, insert order and items
+  Postgres-->>OrderAPI: committed
+  OrderAPI-->>Client: 201 Created with order_id
+```
+
+### Try it
+
+```bash
+curl -s -X POST http://localhost:3002/api/orders \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "user_id": "660e8400-e29b-41d4-a716-446655440001",
+    "items": [
+      {"product_id": "prod-001", "qty": 2, "price_pence": 1999}
+    ]
+  }'
+```
+
+What happens:
+
+1. JSON body is validated (`user_id` UUID, non-empty `items`, positive `qty`, `price_pence` &gt;= 0)
+2. `total_pence` is computed server-side
+3. Order + line items inserted in one Postgres transaction
+4. `201` response with order JSON (`status: "pending"`)
+
+Not implemented yet: Traefik, idempotency keys, Redpanda, async processor, analytics.
+
+Full API details: [order-api](../services/order-api).
+
+---
+
+## Full pipeline (planned)
 
 ```mermaid
 sequenceDiagram
@@ -39,60 +80,21 @@ sequenceDiagram
   AnalyticsAPI-->>Client: 200 JSON summary
 ```
 
-## Step-by-step
+### Planned steps after order creation
 
-### 1. Client submits order
+- **Idempotency** — `Idempotency-Key` header + Redis *(not built)*
+- **Event publish** — `order.created` to Redpanda topic `orders.events` *(not built)*
+- **Async processing** — Rust consumer → ClickHouse + status update *(not built)*
+- **Analytics** — `GET /api/analytics/orders/summary` via Traefik *(not built)*
 
-```bash
-curl -X POST http://localhost:8080/api/orders \
-  -H 'Content-Type: application/json' \
-  -H 'Idempotency-Key: my-unique-key-123' \
-  -d '{
-    "user_id": "660e8400-e29b-41d4-a716-446655440001",
-    "items": [
-      {"product_id": "prod-001", "qty": 2, "price_pence": 1999}
-    ]
-  }'
-```
+### Planned failure behaviour
 
-### 2. order-api validates and persists
-
-- Validates request body
-- Checks idempotency key in Redis
-- Opens a Postgres transaction
-- Inserts into `orders` and `order_items`
-- Commits transaction
-- Publishes `order.created` event to Redpanda topic `orders.events`
-
-Returns `201 Created` with the new `order_id`.
-
-### 3. event-processor consumes asynchronously
-
-- Reads message from `orders.events`
-- Validates against JSON Schema
-- Inserts denormalized row into ClickHouse `order_events`
-- Updates `orders.status` to `processed` in Postgres
-- Commits Kafka offset
-
-This step is **async** — the client does not wait for it.
-
-### 4. Analytics become available
-
-After processing (typically < 1 second locally):
-
-```bash
-curl http://localhost:8080/api/analytics/orders/summary
-# {"total_orders": 42, "total_revenue_pence": 83958, "period": "last_24h"}
-```
-
-## Failure scenarios
-
-| Failure | Behavior |
-|---------|----------|
+| Failure | Target behaviour |
+|---------|------------------|
 | Postgres unavailable | `503` from order-api; no event published |
-| Redpanda unavailable | Order saved; event published on retry (outbox pattern, Phase 3+) |
-| Processor crash mid-message | Offset not committed; message redelivered on restart |
-| Invalid event schema | Message sent to `orders.events.dlq` after 3 retries |
-| Duplicate request (same idempotency key) | Original order returned; no duplicate created |
+| Redpanda unavailable | Order saved; retry / outbox pattern |
+| Processor crash | Offset not committed; redelivery on restart |
+| Invalid event schema | Message to `orders.events.dlq` |
+| Duplicate idempotency key | Return original order |
 
-See [Runbooks](../runbooks/inspect-kafka-lag) for operational recovery steps.
+See [Runbooks](../runbooks/inspect-kafka-lag) when the event pipeline exists.

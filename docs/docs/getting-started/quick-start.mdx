@@ -4,13 +4,56 @@ sidebar_position: 1
 
 # Quick Start
 
-StreamShop runs entirely via Docker Compose. Services are being implemented in phases — see the [architecture plan](https://github.com/ianckc/distributed-systems/blob/main/PLAN.md) for the full roadmap.
-
 ## Prerequisites
 
 - Docker Desktop or Docker Engine + Compose v2.20+
-- 8 GB RAM recommended for the full profile (4 GB for minimal)
-- Node.js 20+ (for running this docs site locally)
+- Node.js 20+ (only if you want to run the docs site locally)
+
+## What works today
+
+| Component | Status |
+|-----------|--------|
+| `order-api` (Go) | `GET /health`, `POST /api/orders` |
+| PostgreSQL 18 | Order persistence |
+| Traefik, catalog, Kafka, analytics, observability | Not yet |
+
+## Run the stack
+
+From the repository root:
+
+```bash
+cp .env.example .env   # optional — defaults work out of the box
+docker compose up --build
+```
+
+This starts **postgres** and **order-api** on port **3002** (no API gateway yet).
+
+### Health check
+
+```bash
+curl http://localhost:3002/health
+```
+
+### Create an order
+
+```bash
+curl -s -X POST http://localhost:3002/api/orders \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "user_id": "660e8400-e29b-41d4-a716-446655440001",
+    "items": [{"product_id": "prod-001", "qty": 2, "price_pence": 1999}]
+  }'
+```
+
+See [order-api](../services/order-api) for request fields, errors, and Postgres inspection.
+
+### Stop
+
+```bash
+docker compose down
+```
+
+To wipe data and re-run init SQL: `docker compose down -v`
 
 ## Run the docs site
 
@@ -20,50 +63,23 @@ npm install
 npm start
 ```
 
-The site opens at [http://localhost:3000](http://localhost:3000).
+Opens at [http://localhost:3000](http://localhost:3000).
 
-## Run the full stack (coming soon)
+## Coming later
 
-Once Phase 1 is implemented:
+The full StreamShop vision adds Traefik on `:8080`, catalog-api, Redpanda, ClickHouse, and observability. Compose profiles (`minimal`, `full`) will be added as those services land. See [PLAN.md](https://github.com/ianckc/distributed-systems/blob/main/PLAN.md).
 
-```bash
-# From repository root
-make up
-
-# Or directly
-docker compose up -d
-```
-
-The API gateway will be available at `http://localhost:8080`.
-
-### Compose profiles
-
-| Profile | What runs | RAM (approx) |
-|---------|-----------|--------------|
-| `minimal` | Gateway, catalog (2×), order API, Postgres, Redis | 2–3 GB |
-| `full` | All services, databases, Redpanda, MinIO, observability | 6–8 GB |
+Planned example calls (via Traefik):
 
 ```bash
-docker compose --profile full up -d
-```
-
-## Example API calls (planned)
-
-```bash
-# Browse catalog
 curl http://localhost:8080/api/catalog/products
-
-# Place an order
-curl -X POST http://localhost:8080/api/orders \
-  -H 'Content-Type: application/json' \
-  -d '{"user_id":"550e8400-e29b-41d4-a716-446655440000","items":[{"product_id":"abc","qty":2}]}'
-
-# Order analytics summary
+curl -X POST http://localhost:8080/api/orders ...
 curl http://localhost:8080/api/analytics/orders/summary
 ```
 
 ## Next steps
 
-- Read the [Architecture Overview](../architecture/overview)
-- Walk through the [Order Placement flow](../data-flows/order-placement)
-- Review [ADRs](../adr/compose-over-k8s) for design rationale
+- [order-api](../services/order-api) — endpoints and configuration
+- [Order placement flow](../data-flows/order-placement) — what's built vs planned
+- [Architecture overview](../architecture/overview)
+- [Local development](../development/local-setup)
