@@ -16,12 +16,12 @@ sidebar_position: 1
 | Traefik v3 | `:8080` → `/api/orders`, `/api/catalog` (catalog via nginx); dashboard `:8081` |
 | nginx | Round-robin to 2× catalog-api |
 | `order-api` (Go) | `GET /health`, `GET /ready`, `POST /api/orders` |
-| `catalog-api` (Node) | 2 replicas; health, ready, product list/detail |
+| `catalog-api` (Node) | 2 replicas; health, ready, product list/detail, MinIO `image_url` |
 | PostgreSQL 18 | Order persistence |
 | MongoDB 8 | Product catalog |
 | Redis 8 | Cache-aside for catalog list/detail (TTL 60s) |
 | Redis Insight | Local GUI on `:5540` (not behind Traefik) |
-| MinIO | S3 API `:9000`, console `:9001`; `product-images` + `exports` buckets |
+| MinIO | Presigned `image_url` on catalog list/detail |
 | Kafka, analytics, observability | Not yet |
 
 ## Run the stack

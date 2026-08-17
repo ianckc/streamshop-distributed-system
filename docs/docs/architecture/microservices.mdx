@@ -17,13 +17,13 @@ StreamShop is polyglot by design — each language handles a role that fits its 
 
 ## catalog-api (Node.js + TypeScript)
 
-**Status:** **Implemented** (2 replicas behind nginx; health + Mongo product list/detail + Redis cache-aside).
+**Status:** **Implemented** (2 replicas behind nginx; health + Mongo product list/detail + Redis cache-aside + MinIO image URLs).
 
-**Responsibility:** Product reads, Redis cache-aside; image upload URLs planned.
+**Responsibility:** Product reads, Redis cache-aside, MinIO image URLs; image upload planned.
 
 - Endpoints: `GET /health`, `GET /ready`, `GET /api/catalog/products`, `GET /api/catalog/products/:id`
-- Writes/reads: MongoDB (`products`); Redis cache (list + detail)
-- Planned: MinIO image upload (MinIO is in Compose)
+- Writes/reads: MongoDB (`products`); Redis cache (list + detail); MinIO (`product-images` reads)
+- Planned: MinIO image upload
 - Why Node.js: Fast I/O for HTTP-heavy read workloads; rich AWS SDK for MinIO
 
 Full reference: [catalog-api service doc](../services/catalog-api).

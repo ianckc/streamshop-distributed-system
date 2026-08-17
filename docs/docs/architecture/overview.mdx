@@ -22,6 +22,8 @@ flowchart LR
   Catalog2 --> Mongo
   Catalog1 --> Redis[(Redis_8)]
   Catalog2 --> Redis
+  Catalog1 --> MinIO[(MinIO)]
+  Catalog2 --> MinIO
   OrderAPI --> Postgres[(PostgreSQL_18)]
 ```
 
@@ -33,7 +35,7 @@ flowchart LR
 - **MongoDB** — `products` collection
 - **Redis** — cache-aside for catalog list/detail (TTL 60s; fail-open)
 - **Redis Insight** on `:5540` — local GUI; not behind Traefik
-- **MinIO** — S3 API `:9000`, console `:9001`; buckets `product-images` and `exports` (empty); catalog-api does not upload yet
+- **MinIO** — S3 API `:9000`, console `:9001`; buckets `product-images` and `exports`; catalog-api returns presigned `image_url` on product reads (upload via API is planned)
 - No queue or other services yet
 
 Details: [catalog-api](../services/catalog-api), [order-api](../services/order-api), [Quick Start](../getting-started/quick-start).
@@ -117,7 +119,7 @@ Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisins
 | `event-processor` | ClickHouse, PostgreSQL (status) | Redpanda |
 | `analytics-api` | — (read-only) | ClickHouse, PostgreSQL |
 
-**catalog-api today:** two replicas behind nginx; `GET /health`, `GET /ready` (Mongo ping), `GET /api/catalog/products`, and `GET /api/catalog/products/:id` with Redis cache-aside; MinIO buckets exist but upload is not wired yet.
+**catalog-api today:** two replicas behind nginx; `GET /health`, `GET /ready` (Mongo ping), `GET /api/catalog/products`, and `GET /api/catalog/products/:id` with Redis cache-aside and MinIO presigned `image_url`; upload via the API is not wired yet.
 
 **order-api today:** writes to PostgreSQL only; exposes `GET /health`, `GET /ready` (Postgres ping), and `POST /api/orders` (no tracing or metrics yet).
 
@@ -132,7 +134,7 @@ Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisins
 | SQL (OLTP) | PostgreSQL 18 | [Storage](./storage) | **Built** |
 | NoSQL | MongoDB 8 | [Storage](./storage) | **Built** |
 | OLAP | ClickHouse 24 | [Storage](./storage) | Planned |
-| Object storage | MinIO | [Storage](./storage) | **Built** (Compose + buckets; upload planned) |
+| Object storage | MinIO | [Storage](./storage) | **Built** (presigned GET on catalog reads) |
 | Observability | OTel, Jaeger, Prometheus, Grafana | [Observability](./observability) | Planned |
 
 ## User journeys (target)

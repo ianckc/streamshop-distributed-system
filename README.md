@@ -16,7 +16,7 @@ curl http://localhost:3001/ready                  # catalog-api-1 Mongo ping
 curl http://localhost:3011/health                 # catalog-api-2 liveness
 curl http://localhost:3002/health                 # order-api liveness
 curl http://localhost:3002/ready                  # order-api Postgres ping
-curl http://localhost:8080/api/catalog/products           # via Traefik → nginx (Mongo + Redis)
+curl http://localhost:8080/api/catalog/products           # via Traefik → nginx (Mongo + Redis + MinIO image_url)
 curl http://localhost:8080/api/catalog/products/prod-001  # via Traefik → nginx
 curl http://localhost:8080/api/orders             # via Traefik (POST with a JSON body)
 ```

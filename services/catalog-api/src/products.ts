@@ -3,4 +3,5 @@ export type Product = {
   name: string;
   price_pence: number;
   attributes: Record<string, string>;
+  image_url?: string;
 };
