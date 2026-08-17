@@ -20,7 +20,7 @@ flowchart LR
 ```
 
 - **Traefik** on `:8080` — `/api/orders` → order-api, `/api/catalog` → catalog-api; dashboard on `:8081`
-- **catalog-api** on `:3001` — `GET /health`, `GET /api/catalog/products`, `GET /api/catalog/products/:id` (also reachable directly)
+- **catalog-api** on `:3001` — `GET /health`, `GET /ready`, `GET /api/catalog/products`, `GET /api/catalog/products/:id` (also reachable directly)
 - **order-api** on `:3002` — `GET /health`, `POST /api/orders` (also reachable directly)
 - **PostgreSQL** — `orders` and `order_items` tables
 - **MongoDB** — `products` collection
@@ -107,7 +107,7 @@ Today: `docker compose up` runs Traefik, postgres, mongo, order-api, and catalog
 | `event-processor` | ClickHouse, PostgreSQL (status) | Redpanda |
 | `analytics-api` | — (read-only) | ClickHouse, PostgreSQL |
 
-**catalog-api today:** `GET /health`, `GET /api/catalog/products`, and `GET /api/catalog/products/:id` from MongoDB; Redis and MinIO are not wired yet.
+**catalog-api today:** `GET /health`, `GET /ready` (Mongo ping), `GET /api/catalog/products`, and `GET /api/catalog/products/:id`; Redis and MinIO are not wired yet.
 
 **order-api today:** writes to PostgreSQL only; exposes `GET /health` (no `/ready`, tracing, or metrics yet).
 

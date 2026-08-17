@@ -32,6 +32,10 @@ export class MongoProductStore implements ProductStore {
     const doc = await this.#collection.findOne({ _id: id });
     return doc ? toProduct(doc) : undefined;
   }
+
+  async ping(): Promise<void> {
+    await this.#collection.db.command({ ping: 1 });
+  }
 }
 
 function toProduct(doc: ProductDocument): Product {

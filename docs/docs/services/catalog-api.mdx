@@ -11,6 +11,7 @@ Node.js HTTP service for the product catalog.
 | Feature | Status |
 |---------|--------|
 | `GET /health` | Implemented |
+| `GET /ready` | Implemented |
 | `GET /api/catalog/products` | Implemented |
 | `GET /api/catalog/products/:id` | Implemented |
 | MongoDB persistence | Implemented |
@@ -36,7 +37,7 @@ cp .env.example .env   # optional
 docker compose up --build
 ```
 
-Starts **Traefik**, **mongo**, **postgres**, **order-api**, and **catalog-api**. Health is at `http://localhost:3001/health`. Products: `http://localhost:8080/api/catalog/products` and `http://localhost:8080/api/catalog/products/prod-001`.
+Starts **Traefik**, **mongo**, **postgres**, **order-api**, and **catalog-api**. Health/ready: `http://localhost:3001/health` and `http://localhost:3001/ready`. Products: `http://localhost:8080/api/catalog/products` and `http://localhost:8080/api/catalog/products/prod-001`.
 
 ## Endpoints
 
@@ -51,6 +52,20 @@ curl http://localhost:3001/health
 ```json
 {"status":"ok","service":"catalog-api"}
 ```
+
+### `GET /ready`
+
+Readiness check: pings MongoDB. Use this to decide if the instance can serve traffic. Compose still healthchecks `/health` (process up).
+
+```bash
+curl http://localhost:3001/ready
+```
+
+```json
+{"status":"ok","service":"catalog-api"}
+```
+
+Mongo unavailable → `503` `{"error":"not ready"}`.
 
 ### `GET /api/catalog/products`
 

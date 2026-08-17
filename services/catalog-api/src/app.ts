@@ -32,6 +32,18 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     service: serviceName,
   }));
 
+  app.get("/ready", async (request, reply) => {
+    try {
+      await options.store.ping();
+      const body: HealthResponse = { status: "ok", service: serviceName };
+      return body;
+    } catch (err) {
+      request.log.error(err);
+      const body: ErrorResponse = { error: "not ready" };
+      return reply.code(503).send(body);
+    }
+  });
+
   app.get("/api/catalog/products", async (request, reply) => {
     try {
       const products = await options.store.listProducts();

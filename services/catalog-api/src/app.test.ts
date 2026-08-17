@@ -5,6 +5,18 @@ import { buildApp } from "./app.js";
 import type { Product } from "./products.js";
 import { MemoryProductStore } from "./store/memory.js";
 
+const failingStore = {
+  async listProducts() {
+    throw new Error("mongo unavailable");
+  },
+  async getProduct() {
+    throw new Error("mongo unavailable");
+  },
+  async ping() {
+    throw new Error("mongo unavailable");
+  },
+};
+
 const sampleProducts: Product[] = [
   {
     id: "prod-001",
@@ -48,14 +60,7 @@ test("GET /api/catalog/products returns products from the store", async () => {
 test("GET /api/catalog/products returns 503 when the store fails", async () => {
   const app = buildApp({
     logger: false,
-    store: {
-      async listProducts() {
-        throw new Error("mongo unavailable");
-      },
-      async getProduct() {
-        throw new Error("mongo unavailable");
-      },
-    },
+    store: failingStore,
   });
 
   const res = await app.inject({ method: "GET", url: "/api/catalog/products" });
@@ -104,14 +109,7 @@ test("GET /api/catalog/products/:id returns 404 when missing", async () => {
 test("GET /api/catalog/products/:id returns 503 when the store fails", async () => {
   const app = buildApp({
     logger: false,
-    store: {
-      async listProducts() {
-        return [];
-      },
-      async getProduct() {
-        throw new Error("mongo unavailable");
-      },
-    },
+    store: failingStore,
   });
 
   const res = await app.inject({
@@ -121,6 +119,35 @@ test("GET /api/catalog/products/:id returns 503 when the store fails", async () 
 
   assert.equal(res.statusCode, 503);
   assert.deepEqual(res.json(), { error: "failed to get product" });
+
+  await app.close();
+});
+
+test("GET /ready returns ok when the store pings", async () => {
+  const app = buildApp({
+    logger: false,
+    serviceName: "catalog-api",
+    store: new MemoryProductStore([]),
+  });
+
+  const res = await app.inject({ method: "GET", url: "/ready" });
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.json(), { status: "ok", service: "catalog-api" });
+
+  await app.close();
+});
+
+test("GET /ready returns 503 when the store ping fails", async () => {
+  const app = buildApp({
+    logger: false,
+    store: failingStore,
+  });
+
+  const res = await app.inject({ method: "GET", url: "/ready" });
+
+  assert.equal(res.statusCode, 503);
+  assert.deepEqual(res.json(), { error: "not ready" });
 
   await app.close();
 });

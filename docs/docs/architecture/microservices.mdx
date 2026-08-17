@@ -21,7 +21,7 @@ StreamShop is polyglot by design — each language handles a role that fits its 
 
 **Responsibility:** Product CRUD, image upload URLs, Redis cache-aside *(planned)*.
 
-- Endpoints: `GET /health`, `GET /api/catalog/products`, `GET /api/catalog/products/:id`
+- Endpoints: `GET /health`, `GET /ready`, `GET /api/catalog/products`, `GET /api/catalog/products/:id`
 - Writes/reads: MongoDB (`products`)
 - Planned: MinIO (images), Redis cache-aside
 - Why Node.js: Fast I/O for HTTP-heavy read workloads; rich AWS SDK for MinIO
@@ -63,7 +63,7 @@ Full reference: [order-api service doc](../services/order-api).
 | Concern | Standard | order-api today | catalog-api today |
 |---------|----------|-----------------|-------------------|
 | Health | `GET /health` | Yes | Yes |
-| Readiness | `GET /ready` | No | No |
+| Readiness | `GET /ready` | No | Yes |
 | Tracing | OpenTelemetry → Jaeger | No | No |
 | Metrics | Prometheus `/metrics` | No | No |
 | Logging | Structured JSON | Yes (slog) | Yes (pino via Fastify) |
