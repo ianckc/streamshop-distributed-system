@@ -27,10 +27,13 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     options.serviceName ?? process.env.SERVICE_NAME ?? "catalog-api";
   const app = Fastify({ logger: options.logger ?? true });
 
-  app.get("/health", async (): Promise<HealthResponse> => ({
-    status: "ok",
-    service: serviceName,
-  }));
+  app.get(
+    "/health",
+    async (): Promise<HealthResponse> => ({
+      status: "ok",
+      service: serviceName,
+    }),
+  );
 
   app.get("/ready", async (request, reply) => {
     try {

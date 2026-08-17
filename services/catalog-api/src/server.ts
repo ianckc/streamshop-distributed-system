@@ -1,5 +1,5 @@
 import { buildApp } from "./app.js";
-import { MongoProductStore, connect } from "./store/mongo.js";
+import { connect, MongoProductStore } from "./store/mongo.js";
 
 const port = Number(process.env.PORT ?? 3001);
 const uri = process.env.MONGODB_URI;
