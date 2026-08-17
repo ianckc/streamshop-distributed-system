@@ -9,7 +9,7 @@ sidebar_position: 1
 | Service | Runtime | Status |
 |---------|---------|--------|
 | `order-api` | Go 1.26+ | **Built** |
-| `catalog-api` | Node.js 22 | Planned |
+| `catalog-api` | Node.js 22 + TypeScript | **Built** (health) |
 | `analytics-api` | Python 3.12 | Planned |
 | `event-processor` | Rust stable | Planned |
 
@@ -17,7 +17,7 @@ sidebar_position: 1
 
 ### With Docker Compose
 
-From the repo root — starts Traefik, Postgres, and the API:
+From the repo root — starts Traefik, Postgres, order-api, and catalog-api:
 
 ```bash
 docker compose up --build
@@ -45,6 +45,30 @@ go tool cover -html=coverage.out -o coverage.html
 
 See [order-api](../services/order-api) for endpoints and configuration.
 
+## catalog-api (implemented)
+
+### With Docker Compose
+
+Included in `docker compose up --build`. Health: `http://localhost:3001/health`.
+
+### App locally
+
+```bash
+cd services/catalog-api
+cp .env.example .env
+npm install
+npm start
+```
+
+### Tests
+
+```bash
+cd services/catalog-api
+npm test
+```
+
+See [catalog-api](../services/catalog-api) for endpoints and configuration.
+
 ## Environment variables (order-api)
 
 ```bash
@@ -66,7 +90,7 @@ When added, the pattern will be:
 docker compose up -d postgres redis mongo clickhouse redpanda minio
 
 # Run one service natively for fast iteration
-cd services/catalog-api && npm run dev
+cd services/catalog-api && npm start
 cd services/order-api && go run ./cmd/server
 ```
 

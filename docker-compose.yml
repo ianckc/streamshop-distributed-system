@@ -71,5 +71,31 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  catalog-api:
+    build:
+      context: ./services/catalog-api
+      dockerfile: Dockerfile
+    container_name: streamshop-catalog-api
+    ports:
+      - "${CATALOG_API_PORT:-3001}:${CATALOG_API_PORT:-3001}"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.catalog-api.rule=PathPrefix(`/api/catalog`)
+      - traefik.http.routers.catalog-api.entrypoints=web
+      - traefik.http.services.catalog-api.loadbalancer.server.port=${CATALOG_API_PORT:-3001}
+    env_file:
+      - path: ./services/catalog-api/.env
+        required: false
+    environment:
+      PORT: ${CATALOG_API_PORT:-3001}
+      SERVICE_NAME: ${CATALOG_API_SERVICE_NAME:-catalog-api}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${PORT}/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
 volumes:
   postgres_data:
