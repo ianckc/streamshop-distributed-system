@@ -8,13 +8,17 @@ StreamShop uses **Redpanda** as its message broker — a Kafka-compatible event 
 
 ## What's running today
 
-Redpanda **v26.2.1** runs in Compose (`streamshop-redpanda`). Kafka API from the host is `localhost:19092`; other Compose services use `redpanda:9092`. Admin API is `localhost:9644`. Data is stored on the `redpanda_data` volume. `--mode dev-container` and `--smp 1` keep it suitable for a laptop. Not behind Traefik. order-api does not publish yet.
+Redpanda **v26.2.1** runs in Compose (`streamshop-redpanda`). Kafka API from the host is `localhost:19092`; other Compose services use `redpanda:9092`. Admin API is `localhost:9644`. Data is stored on the `redpanda_data` volume. `--mode dev-container` and `--smp 1` keep it suitable for a laptop. Not behind Traefik.
 
-Redpanda Console is a local debug GUI on [http://localhost:8082](http://localhost:8082) (not behind Traefik). Use it to browse topics and messages.
+After `POST /api/orders` commits to Postgres, order-api publishes `order.created` to `orders.events` (auto-created on first produce). Produce failures are logged; the HTTP response is still `201`. There is no consumer yet.
+
+Redpanda Console is a local debug GUI on [http://localhost:8082](http://localhost:8082) (not behind Traefik). Place an order, then open topic `orders.events`.
 
 ```bash
-docker compose exec redpanda rpk cluster health
-docker compose exec redpanda rpk topic list
+curl -s -X POST http://localhost:8080/api/orders \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":"660e8400-e29b-41d4-a716-446655440001","items":[{"product_id":"prod-001","qty":2,"price_pence":1999}]}'
+docker compose exec redpanda rpk topic consume orders.events --num 1
 ```
 
 ## Why Redpanda
@@ -28,16 +32,14 @@ docker compose exec redpanda rpk topic list
 
 ## Topics
 
-Planned (created when a producer or init job lands):
-
-| Topic | Purpose |
-|-------|---------|
-| `orders.events` | All order lifecycle events |
-| `orders.events.dlq` | Poison messages after max retries |
+| Topic | Status | Purpose |
+|-------|--------|---------|
+| `orders.events` | **Built** (auto-created on first produce) | Order lifecycle events |
+| `orders.events.dlq` | Planned | Poison messages after max retries |
 
 ## Event schema
 
-Events are validated against a JSON Schema in `schemas/order-created.json`:
+order-api publishes this JSON (schema validation in the consumer is planned):
 
 ```json
 {
@@ -54,14 +56,16 @@ Events are validated against a JSON Schema in `schemas/order-created.json`:
 
 ## Producers and consumers
 
-| Role | Service | Client library |
-|------|---------|----------------|
-| Producer | `order-api` (Go) | kafka-go |
-| Consumer | `event-processor` (Rust) | rust-rdkafka |
+| Role | Service | Client library | Status |
+|------|---------|----------------|--------|
+| Producer | `order-api` (Go) | kafka-go | **Built** |
+| Consumer | `event-processor` (Rust) | rust-rdkafka | Planned |
 
 ## Delivery semantics
 
-StreamShop implements **at-least-once delivery**:
+**Today:** order-api writes to Postgres, then publishes. If produce fails, the order still exists (`201`, error logged). That is a dual-write gap — an outbox is planned, not built.
+
+**Target** (at-least-once, once a consumer exists):
 
 1. `order-api` writes to Postgres in a transaction
 2. Publishes to Redpanda after commit
@@ -80,4 +84,4 @@ Strategy: range
 
 Scaling to multiple processor instances is done by adding consumers to the same group — Redpanda assigns partitions automatically.
 
-See [ADR: At-least-once delivery](../adr/at-least-once-delivery) for the full rationale.
+See [ADR: At-least-once delivery](../adr/006-at-least-once-delivery) for the full rationale.

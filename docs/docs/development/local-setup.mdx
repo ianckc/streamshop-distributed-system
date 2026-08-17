@@ -26,13 +26,13 @@ docker compose up --build
 ### App locally, Postgres in Docker
 
 ```bash
-docker compose up -d postgres
+docker compose up -d postgres redpanda
 cd services/order-api
 cp .env.example .env
 go run ./cmd/server
 ```
 
-`DATABASE_URL` in `.env.example` points at `localhost:5432`.
+`DATABASE_URL` in `.env.example` points at `localhost:5432`. `KAFKA_BROKERS` points at `localhost:19092`.
 
 ### Tests
 

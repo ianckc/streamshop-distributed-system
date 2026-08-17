@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Order Placement
 
-End-to-end order flow from HTTP request to analytics row. **Traefik routing and the sync Postgres write are implemented today** — the rest is the target design.
+End-to-end order flow from HTTP request to analytics row. **Traefik routing, the sync Postgres write, and `order.created` publish are implemented today** — the consumer and analytics are the target design.
 
 ## Implemented today
 
@@ -14,12 +14,14 @@ sequenceDiagram
   participant Traefik
   participant OrderAPI as order-api_Go
   participant Postgres
+  participant Redpanda
 
   Client->>Traefik: POST /api/orders
   Traefik->>OrderAPI: forward request
   OrderAPI->>OrderAPI: validate JSON
   OrderAPI->>Postgres: BEGIN transaction, insert order and items
   Postgres-->>OrderAPI: committed
+  OrderAPI->>Redpanda: publish order.created
   OrderAPI-->>Traefik: 201 Created with order_id
   Traefik-->>Client: 201 Created with order_id
 ```
@@ -42,9 +44,10 @@ What happens:
 1. JSON body is validated (`user_id` UUID, non-empty `items`, positive `qty`, `price_pence` &gt;= 0)
 2. `total_pence` is computed server-side
 3. Order + line items inserted in one Postgres transaction
-4. `201` response with order JSON (`status: "pending"`)
+4. `order.created` published to `orders.events` (fail-open if Redpanda is down)
+5. `201` response with order JSON (`status: "pending"`)
 
-Not implemented yet: idempotency keys, event publish, async processor, analytics. Redpanda itself is in Compose.
+Not implemented yet: idempotency keys, async processor, analytics.
 
 Full API details: [order-api](../services/order-api).
 
@@ -86,7 +89,7 @@ sequenceDiagram
 ### Planned steps after order creation
 
 - **Idempotency** — `Idempotency-Key` header + Redis *(not built)*
-- **Event publish** — `order.created` to Redpanda topic `orders.events` *(broker is in Compose; produce not built)*
+- **Event publish** — `order.created` to Redpanda topic `orders.events` *(built; fail-open)*
 - **Async processing** — Rust consumer → ClickHouse + status update *(not built)*
 - **Analytics** — `GET /api/analytics/orders/summary` via Traefik *(not built)*
 
@@ -95,7 +98,7 @@ sequenceDiagram
 | Failure | Target behaviour |
 |---------|------------------|
 | Postgres unavailable | `503` from order-api; no event published |
-| Redpanda unavailable | Order saved; retry / outbox pattern |
+| Redpanda unavailable | Order saved; `201`; error logged *(outbox planned)* |
 | Processor crash | Offset not committed; redelivery on restart |
 | Invalid event schema | Message to `orders.events.dlq` |
 | Duplicate idempotency key | Return original order |

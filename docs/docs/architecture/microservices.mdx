@@ -30,13 +30,13 @@ Full reference: [catalog-api service doc](../services/catalog-api).
 
 ## order-api (Go)
 
-**Status:** **Implemented** (sync write path only).
+**Status:** **Implemented** (sync write + `order.created` produce).
 
-**Responsibility:** Order creation and Postgres transactions.
+**Responsibility:** Order creation, Postgres transactions, Redpanda produce.
 
-- Writes: PostgreSQL (`orders`, `order_items`)
+- Writes: PostgreSQL (`orders`, `order_items`); Redpanda (`orders.events`)
 - Endpoints: `GET /health`, `GET /ready`, `POST /api/orders`
-- Planned: Redpanda `order.created` events, Redis idempotency
+- Planned: Redis idempotency
 
 Full reference: [order-api service doc](../services/order-api).
 
@@ -77,7 +77,7 @@ flowchart LR
   Catalog[catalog-api] -->|owns| Mongo[(MongoDB)]
   Catalog -->|owns| MinIO[(MinIO)]
   Order[order-api] -->|owns| Postgres[(PostgreSQL)]
-  Order -.->|planned| Redpanda[Redpanda]
+  Order -->|produces| Redpanda[Redpanda]
   Processor[event-processor] -->|owns writes| ClickHouse[(ClickHouse)]
   Analytics[analytics-api] -->|read-only| ClickHouse
   Analytics -->|read-only| Postgres

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,12 +10,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/ianckc/distributed-systems/services/order-api/internal/events"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/model"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/store"
 )
 
 type OrderHandler struct {
-	Store store.OrderStore
+	Store  store.OrderStore
+	Events events.Publisher
 }
 
 type createOrderRequest struct {
@@ -61,6 +64,14 @@ func (h OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
 		slog.Error("failed to create order", "error", err)
 		writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "failed to create order"})
 		return
+	}
+
+	if h.Events != nil {
+		pubCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := h.Events.PublishOrderCreated(pubCtx, created); err != nil {
+			slog.Error("failed to publish order.created", "error", err, "order_id", created.ID)
+		}
 	}
 
 	writeJSON(w, http.StatusCreated, createOrderResponse{

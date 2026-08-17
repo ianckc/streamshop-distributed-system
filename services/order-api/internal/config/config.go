@@ -6,9 +6,10 @@ import (
 )
 
 type Config struct {
-	Port        string
-	ServiceName string
-	DatabaseURL string
+	Port         string
+	ServiceName  string
+	DatabaseURL  string
+	KafkaBrokers string
 }
 
 func Load() (Config, error) {
@@ -27,10 +28,16 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")
 	}
 
+	kafkaBrokers := os.Getenv("KAFKA_BROKERS")
+	if kafkaBrokers == "" {
+		return Config{}, fmt.Errorf("KAFKA_BROKERS is required")
+	}
+
 	return Config{
-		Port:        port,
-		ServiceName: serviceName,
-		DatabaseURL: databaseURL,
+		Port:         port,
+		ServiceName:  serviceName,
+		DatabaseURL:  databaseURL,
+		KafkaBrokers: kafkaBrokers,
 	}, nil
 }
 

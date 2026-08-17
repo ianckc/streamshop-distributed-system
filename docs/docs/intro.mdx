@@ -13,7 +13,7 @@ Customers browse a product catalog, place orders, and trigger an event pipeline 
 
 | Area | Status |
 |------|--------|
-| [order-api](./services/order-api) — health + ready + create order | **Built** |
+| [order-api](./services/order-api) — health + ready + create order + `order.created` | **Built** |
 | [catalog-api](./services/catalog-api) — health + product list/detail | **Built** |
 | PostgreSQL — orders schema | **Built** |
 | MongoDB — product catalog | **Built** |
@@ -21,7 +21,7 @@ Customers browse a product catalog, place orders, and trigger an event pipeline 
 | nginx | **Built** (2× catalog-api, round_robin) |
 | Redis | **Built** (cache-aside, 60s TTL) |
 | MinIO | **Built** (presigned `image_url` on catalog GET; upload planned) |
-| Redpanda | **Built** (broker + Console on `:8082`; produce planned) |
+| Redpanda | **Built** (broker, Console `:8082`, `order.created` produce) |
 | event-processor | Planned |
 | analytics-api + ClickHouse | Planned |
 | Observability stack | Planned |
