@@ -15,7 +15,7 @@ Node.js HTTP service for the product catalog.
 | `GET /api/catalog/products` | Implemented |
 | `GET /api/catalog/products/:id` | Implemented |
 | MongoDB persistence | Implemented |
-| Redis cache-aside | Planned (Redis is in Compose) |
+| Redis cache-aside | Implemented (60s TTL; fail-open) |
 | MinIO image upload | Planned |
 | Nginx replicas | Planned |
 
@@ -26,6 +26,7 @@ Node.js HTTP service for the product catalog.
 | Language | Node.js 22 + TypeScript |
 | HTTP | Fastify 5 |
 | Database | MongoDB 8 via official driver |
+| Cache | Redis 8, cache-aside |
 | Port | `3001` (default) |
 
 ## Run with Docker Compose
@@ -69,7 +70,7 @@ Mongo unavailable → `503` `{"error":"not ready"}`.
 
 ### `GET /api/catalog/products`
 
-Returns the product catalog from MongoDB (`products` collection). Amounts are in **pence**.
+Returns the product catalog from MongoDB (`products` collection), with Redis cache-aside (`catalog:products`, TTL 60s). Amounts are in **pence**. First request after a miss sets `x-cache: miss`; the next request within the TTL is `x-cache: hit`. Redis unavailable → serve Mongo and still return 200 (`x-cache: miss`). `/ready` still pings Mongo only.
 
 ```bash
 curl http://localhost:8080/api/catalog/products
@@ -94,7 +95,7 @@ Mongo unavailable → `503` `{"error":"failed to list products"}`.
 
 ### `GET /api/catalog/products/:id`
 
-Returns one product. Same JSON shape as an item in the list.
+Returns one product. Same JSON shape as an item in the list. Cached at `catalog:product:{id}` (TTL 60s). 404s are not cached.
 
 ```bash
 curl http://localhost:8080/api/catalog/products/prod-001
@@ -126,9 +127,10 @@ Seed data is loaded from `infra/mongo/seed.js` on first start of an empty volume
 
 ```bash
 docker compose exec redis redis-cli ping
+docker compose exec redis redis-cli GET catalog:products
 ```
 
-Redis Insight (local GUI, not behind Traefik): [http://localhost:5540](http://localhost:5540). Catalog queries do not use Redis yet.
+Redis Insight (local GUI, not behind Traefik): [http://localhost:5540](http://localhost:5540). Hit list or detail once, then inspect `catalog:products` and `catalog:product:prod-001`.
 
 ## Configuration
 
@@ -137,19 +139,19 @@ Redis Insight (local GUI, not behind Traefik): [http://localhost:5540](http://lo
 | `PORT` | `3001` | HTTP listen port |
 | `SERVICE_NAME` | `catalog-api` | Shown in health response |
 | `MONGODB_URI` | *(required)* | MongoDB connection string |
-| `REDIS_URL` | *(set in Compose)* | Redis URL; not used by the app yet |
+| `REDIS_URL` | *(required)* | Redis connection string |
 
 ## Local development (without running the app in Docker)
 
 ```bash
-docker compose up -d mongo
+docker compose up -d mongo redis
 cd services/catalog-api
 cp .env.example .env
 npm install
 npm start
 ```
 
-`MONGODB_URI` in `.env.example` points at `localhost:27017`. Inside Compose the hostname is `mongo`. Redis is at `localhost:6379` (`REDIS_URL`); catalog-api does not read it yet.
+`MONGODB_URI` and `REDIS_URL` in `.env.example` point at `localhost`. Inside Compose the hostnames are `mongo` and `redis`.
 
 ## Tests
 
@@ -159,16 +161,20 @@ npm run test:coverage
 npm run lint
 ```
 
-`npm run lint:fix` applies Biome format and lint fixes. Handler tests use an in-memory fake store — no Mongo required. Coverage is printed in the terminal; HTML is written to `coverage/index.html`. Excluded: `src/server.ts` (process entrypoint) and type-only modules. `src/store/mongo.ts` stays in the report at 0% until Mongo is tested (mock or Testcontainers).
+`npm run lint:fix` applies Biome format and lint fixes. Handler tests use an in-memory fake store and cache — no Mongo or Redis required. Coverage is printed in the terminal; HTML is written to `coverage/index.html`. Excluded: `src/server.ts` (process entrypoint) and type-only modules. `src/store/mongo.ts` stays in the report at 0% until Mongo is tested (mock or Testcontainers). `src/cache/redis.ts` `connectRedis` is untested; `RedisProductCache` is covered with a fake client.
 
 ## Project layout
 
 ```
 src/app.ts            Fastify app and routes
+src/cache.ts          Cache-aside helper and key names
+src/cache/memory.ts   In-memory cache (tests)
+src/cache/redis.ts    Redis cache
 src/products.ts       Product type
 src/store.ts          ProductStore interface
 src/store/memory.ts   In-memory store (tests)
 src/store/mongo.ts    MongoDB store
 src/server.ts         HTTP listen entrypoint
 src/app.test.ts       Handler tests
+src/cache.test.ts     Cache-aside tests
 ```

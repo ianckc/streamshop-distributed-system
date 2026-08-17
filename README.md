@@ -14,7 +14,7 @@ Traefik is the HTTP entrypoint on **:8080**. Services are also published directl
 curl http://localhost:3001/health                 # catalog-api liveness
 curl http://localhost:3001/ready                  # catalog-api Mongo ping
 curl http://localhost:3002/health                 # order-api
-curl http://localhost:8080/api/catalog/products           # via Traefik (Mongo)
-curl http://localhost:8080/api/catalog/products/prod-001  # via Traefik (Mongo)
+curl http://localhost:8080/api/catalog/products           # via Traefik (Mongo + Redis cache)
+curl http://localhost:8080/api/catalog/products/prod-001  # via Traefik (Mongo + Redis cache)
 curl http://localhost:8080/api/orders             # via Traefik (POST with a JSON body)
 ```

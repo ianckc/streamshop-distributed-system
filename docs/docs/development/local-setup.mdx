@@ -51,17 +51,17 @@ See [order-api](../services/order-api) for endpoints and configuration.
 
 Included in `docker compose up --build`. Health: `http://localhost:3001/health`. Ready: `http://localhost:3001/ready`. Products: `http://localhost:8080/api/catalog/products` and `http://localhost:8080/api/catalog/products/prod-001`.
 
-### App locally, Mongo in Docker
+### App locally, Mongo and Redis in Docker
 
 ```bash
-docker compose up -d mongo
+docker compose up -d mongo redis
 cd services/catalog-api
 cp .env.example .env
 npm install
 npm start
 ```
 
-`MONGODB_URI` in `.env.example` points at `localhost:27017`.
+`MONGODB_URI` and `REDIS_URL` in `.env.example` point at `localhost`.
 
 ### Tests
 
@@ -95,7 +95,7 @@ MONGODB_URI=mongodb://localhost:27017/streamshop
 REDIS_URL=redis://localhost:6379
 ```
 
-Copy from `services/catalog-api/.env.example`. `MONGODB_URI` is **required**. `REDIS_URL` is set for Compose; the app does not use it yet.
+Copy from `services/catalog-api/.env.example`. `MONGODB_URI` and `REDIS_URL` are **required**.
 
 ## Other services (planned)
 

@@ -18,7 +18,7 @@ sidebar_position: 1
 | `catalog-api` (Node) | `GET /health`, `GET /ready`, product list/detail |
 | PostgreSQL 18 | Order persistence |
 | MongoDB 8 | Product catalog |
-| Redis 8 | In Compose; not used by catalog-api yet |
+| Redis 8 | Cache-aside for catalog list/detail (TTL 60s) |
 | Redis Insight | Local GUI on `:5540` (not behind Traefik) |
 | Kafka, analytics, observability | Not yet |
 

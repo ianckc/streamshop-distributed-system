@@ -1,5 +1,12 @@
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 
+import {
+  CATALOG_LIST_KEY,
+  type CacheStatus,
+  cacheAside,
+  catalogProductKey,
+  type ProductCache,
+} from "./cache.js";
 import type { Product } from "./products.js";
 import type { ProductStore } from "./store.js";
 
@@ -7,6 +14,7 @@ export type BuildAppOptions = {
   serviceName?: string;
   logger?: boolean;
   store: ProductStore;
+  cache?: ProductCache;
 };
 
 export type HealthResponse = {
@@ -49,7 +57,13 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
   app.get("/api/catalog/products", async (request, reply) => {
     try {
-      const products = await options.store.listProducts();
+      const { value: products, status } = await cacheAside(
+        options.cache,
+        CATALOG_LIST_KEY,
+        () => options.store.listProducts(),
+        { onError: (err) => request.log.error(err) },
+      );
+      setCacheHeader(reply, status);
       const body: ProductListResponse = { products };
       return body;
     } catch (err) {
@@ -63,7 +77,16 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     "/api/catalog/products/:id",
     async (request, reply) => {
       try {
-        const product = await options.store.getProduct(request.params.id);
+        const { value: product, status } = await cacheAside(
+          options.cache,
+          catalogProductKey(request.params.id),
+          () => options.store.getProduct(request.params.id),
+          {
+            onError: (err) => request.log.error(err),
+            shouldCache: (value) => value !== undefined,
+          },
+        );
+        setCacheHeader(reply, status);
         if (!product) {
           const body: ErrorResponse = { error: "product not found" };
           return reply.code(404).send(body);
@@ -78,4 +101,10 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   );
 
   return app;
+}
+
+function setCacheHeader(reply: FastifyReply, status: CacheStatus): void {
+  if (status !== "bypass") {
+    void reply.header("x-cache", status);
+  }
 }

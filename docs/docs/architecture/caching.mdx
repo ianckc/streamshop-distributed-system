@@ -8,12 +8,13 @@ StreamShop uses **Redis 8** as an in-memory cache. Redis is never used as a prim
 
 ## What's running today
 
-Redis is in Docker Compose (`localhost:6379`, no password). **catalog-api does not read or write Redis yet** — product list/detail still hit Mongo on every request. Cache-aside is the next catalog slice.
+Redis is in Docker Compose (`localhost:6379`, no password). catalog-api uses **cache-aside** on product list and detail: Redis first, Mongo on miss, then `SET` with TTL **60 seconds**. Redis down does not fail the request — Mongo still serves (`x-cache: miss`). `/ready` pings Mongo only.
 
 Redis Insight is a local debug GUI on [http://localhost:5540](http://localhost:5540) (not behind Traefik). It is preconnected to the Compose Redis service as `streamshop`.
 
 ```bash
-docker compose exec redis redis-cli ping
+curl -sI http://localhost:8080/api/catalog/products | grep -i x-cache
+docker compose exec redis redis-cli GET catalog:products
 ```
 
 ## Patterns
@@ -69,11 +70,4 @@ Traefik rate limiting can be backed by Redis for distributed counting across gat
 
 ## Observability
 
-Cache hit ratio is exposed as a Prometheus metric on `catalog-api`:
-
-```
-catalog_cache_hits_total
-catalog_cache_misses_total
-```
-
-Target hit ratio for the product list under normal load: **> 80%**.
+Cache hit/miss counters are **planned** (`catalog_cache_hits_total`, `catalog_cache_misses_total`). Today the `x-cache` response header is `hit` or `miss` on catalog product routes.
