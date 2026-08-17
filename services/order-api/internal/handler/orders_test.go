@@ -17,10 +17,18 @@ import (
 
 type fakeOrderStore struct {
 	createFn func(ctx context.Context, order model.Order) (model.Order, error)
+	pingFn   func(ctx context.Context) error
 }
 
 func (f fakeOrderStore) CreateOrder(ctx context.Context, order model.Order) (model.Order, error) {
 	return f.createFn(ctx, order)
+}
+
+func (f fakeOrderStore) Ping(ctx context.Context) error {
+	if f.pingFn != nil {
+		return f.pingFn(ctx)
+	}
+	return nil
 }
 
 func TestOrderHandlerCreate(t *testing.T) {

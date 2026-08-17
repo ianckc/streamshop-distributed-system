@@ -8,4 +8,5 @@ import (
 
 type OrderStore interface {
 	CreateOrder(ctx context.Context, order model.Order) (model.Order, error)
+	Ping(ctx context.Context) error
 }
