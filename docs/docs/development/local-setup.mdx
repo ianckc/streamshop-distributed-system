@@ -17,7 +17,7 @@ sidebar_position: 1
 
 ### With Docker Compose
 
-From the repo root — starts Traefik, nginx, Postgres, Mongo, Redis, Redis Insight, order-api, and two catalog-api replicas:
+From the repo root — starts Traefik, nginx, Postgres, Mongo, Redis, Redis Insight, MinIO, order-api, and two catalog-api replicas:
 
 ```bash
 docker compose up --build
@@ -93,9 +93,15 @@ PORT=3001
 SERVICE_NAME=catalog-api
 MONGODB_URI=mongodb://localhost:27017/streamshop
 REDIS_URL=redis://localhost:6379
+S3_ENDPOINT=http://localhost:9000
+S3_PUBLIC_ENDPOINT=http://localhost:9000
+S3_ACCESS_KEY=streamshop
+S3_SECRET_KEY=streamshop
+S3_BUCKET=product-images
+S3_REGION=us-east-1
 ```
 
-Copy from `services/catalog-api/.env.example`. `MONGODB_URI` and `REDIS_URL` are **required**.
+Copy from `services/catalog-api/.env.example`. `MONGODB_URI`, `REDIS_URL`, and `S3_ENDPOINT` / keys / bucket are **required**.
 
 ## Other services (planned)
 

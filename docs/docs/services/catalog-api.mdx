@@ -16,6 +16,7 @@ Node.js HTTP service for the product catalog.
 | `GET /api/catalog/products/:id` | Implemented |
 | MongoDB persistence | Implemented |
 | Redis cache-aside | Implemented (60s TTL; fail-open) |
+| MinIO image URLs | Implemented (presigned GET; `{id}.png`) |
 | MinIO image upload | Planned |
 | Nginx replicas | Implemented (2 behind nginx, round_robin) |
 
@@ -27,6 +28,7 @@ Node.js HTTP service for the product catalog.
 | HTTP | Fastify 5 |
 | Database | MongoDB 8 via official driver |
 | Cache | Redis 8, cache-aside |
+| Objects | MinIO (`product-images`) |
 | Port | `3001` (replica 1; replica 2 is `3011`) |
 
 ## Run with Docker Compose
@@ -38,7 +40,7 @@ cp .env.example .env   # optional
 docker compose up --build
 ```
 
-Starts **Traefik**, **nginx**, **mongo**, **redis**, **redisinsight**, **postgres**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Health/ready: `http://localhost:3001/health` (replica 1) and `http://localhost:3011/health` (replica 2). Products via Traefik → nginx: `http://localhost:8080/api/catalog/products`.
+Starts **Traefik**, **nginx**, **mongo**, **redis**, **redisinsight**, **minio**, **postgres**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Health/ready: `http://localhost:3001/health` (replica 1) and `http://localhost:3011/health` (replica 2). Products via Traefik → nginx: `http://localhost:8080/api/catalog/products`.
 
 ## Endpoints
 
@@ -72,7 +74,7 @@ Mongo unavailable → `503` `{"error":"not ready"}`.
 
 ### `GET /api/catalog/products`
 
-Returns the product catalog from MongoDB (`products` collection), with Redis cache-aside (`catalog:products`, TTL 60s). Amounts are in **pence**. First request after a miss sets `x-cache: miss`; the next request within the TTL is `x-cache: hit`. Traefik → nginx round-robins replicas; `x-replica-id` shows which one served the request. Redis unavailable → serve Mongo and still return 200 (`x-cache: miss`). `/ready` still pings Mongo only.
+Returns the product catalog from MongoDB (`products` collection), with Redis cache-aside (`catalog:products`, TTL 60s). Amounts are in **pence**. When `product-images/{id}.png` exists in MinIO, the item includes a presigned `image_url` (1 hour, host rewritten to `localhost:9000`). MinIO down or missing object → product JSON without `image_url` (fail-open). First request after a miss sets `x-cache: miss`; the next request within the TTL is `x-cache: hit`. Traefik → nginx round-robins replicas; `x-replica-id` shows which one served the request. Redis unavailable → serve Mongo and still return 200 (`x-cache: miss`). `/ready` still pings Mongo only.
 
 ```bash
 curl http://localhost:8080/api/catalog/products
@@ -85,13 +87,14 @@ curl http://localhost:8080/api/catalog/products
       "id": "prod-001",
       "name": "StreamShop Mug",
       "price_pence": 1999,
-      "attributes": { "colour": "navy", "material": "ceramic" }
+      "attributes": { "colour": "navy", "material": "ceramic" },
+      "image_url": "http://localhost:9000/product-images/prod-001.png?X-Amz-Algorithm=..."
     }
   ]
 }
 ```
 
-`id` values match `product_id` on `POST /api/orders` (e.g. `prod-001`). In Mongo the public id is stored as `_id`. `attributes` is a free-form string map.
+`id` values match `product_id` on `POST /api/orders` (e.g. `prod-001`). In Mongo the public id is stored as `_id`. `attributes` is a free-form string map. `image_url` is omitted when there is no object. Redis caches the Mongo document only; presigned URLs are attached after the cache.
 
 Mongo unavailable → `503` `{"error":"failed to list products"}`.
 
@@ -108,7 +111,8 @@ curl http://localhost:8080/api/catalog/products/prod-001
   "id": "prod-001",
   "name": "StreamShop Mug",
   "price_pence": 1999,
-  "attributes": { "colour": "navy", "material": "ceramic" }
+  "attributes": { "colour": "navy", "material": "ceramic" },
+  "image_url": "http://localhost:9000/product-images/prod-001.png?X-Amz-Algorithm=..."
 }
 ```
 
@@ -134,6 +138,15 @@ docker compose exec redis redis-cli GET catalog:products
 
 Redis Insight (local GUI, not behind Traefik): [http://localhost:5540](http://localhost:5540). Hit list or detail once, then inspect `catalog:products` and `catalog:product:prod-001`.
 
+### Inspect MinIO
+
+MinIO console (not behind Traefik): [http://localhost:9001](http://localhost:9001) (`streamshop` / `streamshop`). S3 API: `http://localhost:9000`. Object key for a product is `{id}.png` in `product-images`. Catalog list/detail return a presigned `image_url` when that object exists. Upload via the API is not wired yet.
+
+```bash
+curl -sI http://localhost:9000/minio/health/live
+curl -s http://localhost:8080/api/catalog/products/prod-001 | jq .image_url
+```
+
 ## Configuration
 
 | Variable | Default | Description |
@@ -142,18 +155,24 @@ Redis Insight (local GUI, not behind Traefik): [http://localhost:5540](http://lo
 | `SERVICE_NAME` | `catalog-api` | Shown in health/ready JSON and `x-replica-id` (Compose uses `catalog-api-1` / `catalog-api-2`) |
 | `MONGODB_URI` | *(required)* | MongoDB connection string |
 | `REDIS_URL` | *(required)* | Redis connection string |
+| `S3_ENDPOINT` | *(required)* | MinIO/S3 API URL (Compose: `http://minio:9000`) |
+| `S3_PUBLIC_ENDPOINT` | `http://localhost:9000` | Host rewritten into presigned URLs |
+| `S3_ACCESS_KEY` | *(required)* | MinIO root user |
+| `S3_SECRET_KEY` | *(required)* | MinIO root password |
+| `S3_BUCKET` | `product-images` | Image bucket |
+| `S3_REGION` | `us-east-1` | Required by the AWS SDK; unused by MinIO |
 
 ## Local development (without running the app in Docker)
 
 ```bash
-docker compose up -d mongo redis
+docker compose up -d mongo redis minio minio-init
 cd services/catalog-api
 cp .env.example .env
 npm install
 npm start
 ```
 
-`MONGODB_URI` and `REDIS_URL` in `.env.example` point at `localhost`. Inside Compose the hostnames are `mongo` and `redis`.
+`MONGODB_URI`, `REDIS_URL`, and `S3_*` in `.env.example` point at `localhost`. Inside Compose the hostnames are `mongo`, `redis`, and `minio`.
 
 ## Tests
 
@@ -163,7 +182,7 @@ npm run test:coverage
 npm run lint
 ```
 
-`npm run lint:fix` applies Biome format and lint fixes. Handler tests use an in-memory fake store and cache — no Mongo or Redis required. Coverage is printed in the terminal; HTML is written to `coverage/index.html`. Excluded: `src/server.ts` (process entrypoint) and type-only modules. `src/store/mongo.ts` stays in the report at 0% until Mongo is tested (mock or Testcontainers). `src/cache/redis.ts` `connectRedis` is untested; `RedisProductCache` is covered with a fake client.
+`npm run lint:fix` applies Biome format and lint fixes. Handler tests use an in-memory fake store, cache, and image store — no Mongo, Redis, or MinIO required. Coverage is printed in the terminal; HTML is written to `coverage/index.html`. Excluded: `src/server.ts` (process entrypoint) and type-only modules. `src/store/mongo.ts` stays in the report at 0% until Mongo is tested (mock or Testcontainers). `src/cache/redis.ts` `connectRedis` is untested; `RedisProductCache` is covered with a fake client. `src/images/s3.ts` is untested against MinIO (unit tests use the in-memory image store).
 
 ## Project layout
 
@@ -172,6 +191,9 @@ src/app.ts            Fastify app and routes
 src/cache.ts          Cache-aside helper and key names
 src/cache/memory.ts   In-memory cache (tests)
 src/cache/redis.ts    Redis cache
+src/images.ts         Presigned URL helper
+src/images/memory.ts  In-memory images (tests)
+src/images/s3.ts      MinIO/S3 images
 src/products.ts       Product type
 src/store.ts          ProductStore interface
 src/store/memory.ts   In-memory store (tests)
@@ -179,4 +201,5 @@ src/store/mongo.ts    MongoDB store
 src/server.ts         HTTP listen entrypoint
 src/app.test.ts       Handler tests
 src/cache.test.ts     Cache-aside tests
+src/images.test.ts    Image URL tests
 ```

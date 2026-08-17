@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import { buildApp } from "./app.js";
 import { MemoryProductCache } from "./cache/memory.js";
+import { MemoryProductImages } from "./images/memory.js";
 import type { Product } from "./products.js";
 import { MemoryProductStore } from "./store/memory.js";
 
@@ -245,6 +246,78 @@ test("GET /api/catalog/products fail-open when cache get throws", async () => {
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers["x-cache"], "miss");
+  assert.deepEqual(res.json(), { products: sampleProducts });
+
+  await app.close();
+});
+
+test("GET /api/catalog/products includes image_url from the image store", async () => {
+  const app = buildApp({
+    logger: false,
+    store: new MemoryProductStore(sampleProducts),
+    images: new MemoryProductImages({
+      "prod-001": "http://localhost:9000/product-images/prod-001.png",
+    }),
+  });
+
+  const res = await app.inject({
+    method: "GET",
+    url: "/api/catalog/products",
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.json(), {
+    products: [
+      {
+        ...sampleProducts[0],
+        image_url: "http://localhost:9000/product-images/prod-001.png",
+      },
+    ],
+  });
+
+  await app.close();
+});
+
+test("GET /api/catalog/products/:id includes image_url from the image store", async () => {
+  const app = buildApp({
+    logger: false,
+    store: new MemoryProductStore(sampleProducts),
+    images: new MemoryProductImages({
+      "prod-001": "http://localhost:9000/product-images/prod-001.png",
+    }),
+  });
+
+  const res = await app.inject({
+    method: "GET",
+    url: "/api/catalog/products/prod-001",
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.json(), {
+    ...sampleProducts[0],
+    image_url: "http://localhost:9000/product-images/prod-001.png",
+  });
+
+  await app.close();
+});
+
+test("GET /api/catalog/products fail-open when image store throws", async () => {
+  const app = buildApp({
+    logger: false,
+    store: new MemoryProductStore(sampleProducts),
+    images: {
+      async getImageUrl() {
+        throw new Error("minio down");
+      },
+    },
+  });
+
+  const res = await app.inject({
+    method: "GET",
+    url: "/api/catalog/products",
+  });
+
+  assert.equal(res.statusCode, 200);
   assert.deepEqual(res.json(), { products: sampleProducts });
 
   await app.close();

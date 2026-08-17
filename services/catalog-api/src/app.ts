@@ -7,6 +7,11 @@ import {
   catalogProductKey,
   type ProductCache,
 } from "./cache.js";
+import {
+  attachImageUrl,
+  attachImageUrls,
+  type ProductImages,
+} from "./images.js";
 import type { Product } from "./products.js";
 import type { ProductStore } from "./store.js";
 
@@ -15,6 +20,7 @@ export type BuildAppOptions = {
   logger?: boolean;
   store: ProductStore;
   cache?: ProductCache;
+  images?: ProductImages;
 };
 
 export type HealthResponse = {
@@ -68,7 +74,11 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         { onError: (err) => request.log.error(err) },
       );
       setCacheHeader(reply, status);
-      const body: ProductListResponse = { products };
+      const body: ProductListResponse = {
+        products: await attachImageUrls(products, options.images, (err) =>
+          request.log.error(err),
+        ),
+      };
       return body;
     } catch (err) {
       request.log.error(err);
@@ -95,7 +105,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           const body: ErrorResponse = { error: "product not found" };
           return reply.code(404).send(body);
         }
-        return product;
+        return attachImageUrl(product, options.images, (err) =>
+          request.log.error(err),
+        );
       } catch (err) {
         request.log.error(err);
         const body: ErrorResponse = { error: "failed to get product" };

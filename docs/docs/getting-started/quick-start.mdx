@@ -16,11 +16,12 @@ sidebar_position: 1
 | Traefik v3 | `:8080` → `/api/orders`, `/api/catalog` (catalog via nginx); dashboard `:8081` |
 | nginx | Round-robin to 2× catalog-api |
 | `order-api` (Go) | `GET /health`, `GET /ready`, `POST /api/orders` |
-| `catalog-api` (Node) | 2 replicas; health, ready, product list/detail |
+| `catalog-api` (Node) | 2 replicas; health, ready, product list/detail, MinIO `image_url` |
 | PostgreSQL 18 | Order persistence |
 | MongoDB 8 | Product catalog |
 | Redis 8 | Cache-aside for catalog list/detail (TTL 60s) |
 | Redis Insight | Local GUI on `:5540` (not behind Traefik) |
+| MinIO | Presigned `image_url` on catalog list/detail |
 | Kafka, analytics, observability | Not yet |
 
 ## Run the stack
@@ -32,7 +33,7 @@ cp .env.example .env   # optional — defaults work out of the box
 docker compose up --build
 ```
 
-This starts **Traefik**, **nginx**, **postgres**, **mongo**, **redis**, **redisinsight**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Place orders and list products through the gateway on **:8080**; health and debug calls can still hit **:3001** / **:3011** / **:3002** directly. Redis Insight is on **:5540**.
+This starts **Traefik**, **nginx**, **postgres**, **mongo**, **redis**, **redisinsight**, **minio**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Place orders and list products through the gateway on **:8080**; health and debug calls can still hit **:3001** / **:3011** / **:3002** directly. Redis Insight is on **:5540**. MinIO console is on **:9001**.
 
 ### Health checks (direct)
 
