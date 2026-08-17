@@ -35,7 +35,7 @@ Full reference: [catalog-api service doc](../services/catalog-api).
 **Responsibility:** Order creation and Postgres transactions.
 
 - Writes: PostgreSQL (`orders`, `order_items`)
-- Endpoints: `GET /health`, `POST /api/orders`
+- Endpoints: `GET /health`, `GET /ready`, `POST /api/orders`
 - Planned: Redpanda `order.created` events, Redis idempotency
 
 Full reference: [order-api service doc](../services/order-api).
@@ -63,7 +63,7 @@ Full reference: [order-api service doc](../services/order-api).
 | Concern | Standard | order-api today | catalog-api today |
 |---------|----------|-----------------|-------------------|
 | Health | `GET /health` | Yes | Yes |
-| Readiness | `GET /ready` | No | Yes |
+| Readiness | `GET /ready` | Yes | Yes |
 | Tracing | OpenTelemetry → Jaeger | No | No |
 | Metrics | Prometheus `/metrics` | No | No |
 | Logging | Structured JSON | Yes (slog) | Yes (pino via Fastify) |

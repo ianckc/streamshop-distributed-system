@@ -11,12 +11,12 @@ Go HTTP service for creating orders and persisting them to PostgreSQL.
 | Feature | Status |
 |---------|--------|
 | `GET /health` | Implemented |
+| `GET /ready` | Implemented |
 | `POST /api/orders` | Implemented |
 | Traefik route (`/api/orders` on `:8080`) | Implemented |
 | Postgres persistence (`orders`, `order_items`) | Implemented |
 | Redpanda event publishing | Planned |
 | Redis idempotency keys | Planned |
-| `GET /ready` | Planned |
 | OpenTelemetry / metrics | Planned |
 
 ## Stack
@@ -37,7 +37,7 @@ cp .env.example .env   # optional
 docker compose up --build
 ```
 
-Starts **Traefik**, **nginx**, **postgres**, **mongo**, **redis**, **redisinsight**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Place orders at `http://localhost:8080/api/orders`. The service is also on `http://localhost:3002` for health checks and local debugging.
+Starts **Traefik**, **nginx**, **postgres**, **mongo**, **redis**, **redisinsight**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Place orders at `http://localhost:8080/api/orders`. Health/ready: `http://localhost:3002/health` and `http://localhost:3002/ready`.
 
 ## Endpoints
 
@@ -52,6 +52,20 @@ curl http://localhost:3002/health
 ```json
 {"status":"ok","service":"order-api"}
 ```
+
+### `GET /ready`
+
+Readiness check: pings PostgreSQL. Use this to decide if the instance can serve traffic. Compose still healthchecks `/health` (process up).
+
+```bash
+curl http://localhost:3002/ready
+```
+
+```json
+{"status":"ok","service":"order-api"}
+```
+
+Postgres unavailable → `503` `{"error":"not ready"}`.
 
 ### `POST /api/orders`
 
@@ -122,7 +136,7 @@ docker compose exec postgres \
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3002` | HTTP listen port |
-| `SERVICE_NAME` | `order-api` | Shown in health response |
+| `SERVICE_NAME` | `order-api` | Shown in health and ready responses |
 | `DATABASE_URL` | *(required)* | Postgres connection string |
 
 Compose also reads root `.env` for `ORDER_API_PORT`, `ORDER_API_SERVICE_NAME`, and `DATABASE_URL`.

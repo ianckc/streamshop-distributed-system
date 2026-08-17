@@ -34,10 +34,12 @@ func main() {
 	}
 	defer pool.Close()
 
-	orderHandler := handler.OrderHandler{Store: postgres.NewOrderStore(pool)}
+	orderStore := postgres.NewOrderStore(pool)
+	orderHandler := handler.OrderHandler{Store: orderStore}
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /health", handler.HealthHandler{ServiceName: cfg.ServiceName})
+	mux.Handle("GET /ready", handler.ReadyHandler{ServiceName: cfg.ServiceName, Store: orderStore})
 	mux.HandleFunc("POST /api/orders", orderHandler.Create)
 
 	server := &http.Server{
