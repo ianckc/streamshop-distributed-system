@@ -55,3 +55,7 @@ func (s *OrderStore) CreateOrder(ctx context.Context, order model.Order) (model.
 	order.CreatedAt = createdAt
 	return order, nil
 }
+
+func (s *OrderStore) Ping(ctx context.Context) error {
+	return s.pool.Ping(ctx)
+}

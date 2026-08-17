@@ -14,7 +14,7 @@ sidebar_position: 1
 | Component | Status |
 |-----------|--------|
 | Traefik v3 | `:8080` → `/api/orders`, `/api/catalog`; dashboard `:8081` |
-| `order-api` (Go) | `GET /health`, `POST /api/orders` |
+| `order-api` (Go) | `GET /health`, `GET /ready`, `POST /api/orders` |
 | `catalog-api` (Node) | `GET /health`, `GET /ready`, product list/detail |
 | PostgreSQL 18 | Order persistence |
 | MongoDB 8 | Product catalog |
@@ -38,7 +38,8 @@ This starts **Traefik**, **postgres**, **mongo**, **redis**, **redisinsight**, *
 ```bash
 curl http://localhost:3001/health   # catalog-api liveness
 curl http://localhost:3001/ready    # catalog-api Mongo ping
-curl http://localhost:3002/health   # order-api
+curl http://localhost:3002/health   # order-api liveness
+curl http://localhost:3002/ready    # order-api Postgres ping
 ```
 
 ### Create an order (via Traefik)
