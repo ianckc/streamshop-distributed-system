@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { buildApp } from "./app.js";
+import { MemoryProductCache } from "./cache/memory.js";
 import type { Product } from "./products.js";
 import { MemoryProductStore } from "./store/memory.js";
 
@@ -148,6 +149,102 @@ test("GET /ready returns 503 when the store ping fails", async () => {
 
   assert.equal(res.statusCode, 503);
   assert.deepEqual(res.json(), { error: "not ready" });
+
+  await app.close();
+});
+
+test("GET /api/catalog/products sets x-cache miss then hit", async () => {
+  const app = buildApp({
+    logger: false,
+    store: new MemoryProductStore(sampleProducts),
+    cache: new MemoryProductCache(),
+  });
+
+  const miss = await app.inject({
+    method: "GET",
+    url: "/api/catalog/products",
+  });
+  const hit = await app.inject({
+    method: "GET",
+    url: "/api/catalog/products",
+  });
+
+  assert.equal(miss.statusCode, 200);
+  assert.equal(miss.headers["x-cache"], "miss");
+  assert.equal(hit.statusCode, 200);
+  assert.equal(hit.headers["x-cache"], "hit");
+  assert.deepEqual(hit.json(), { products: sampleProducts });
+
+  await app.close();
+});
+
+test("GET /api/catalog/products/:id sets x-cache miss then hit", async () => {
+  const app = buildApp({
+    logger: false,
+    store: new MemoryProductStore(sampleProducts),
+    cache: new MemoryProductCache(),
+  });
+
+  const miss = await app.inject({
+    method: "GET",
+    url: "/api/catalog/products/prod-001",
+  });
+  const hit = await app.inject({
+    method: "GET",
+    url: "/api/catalog/products/prod-001",
+  });
+
+  assert.equal(miss.headers["x-cache"], "miss");
+  assert.equal(hit.headers["x-cache"], "hit");
+  assert.deepEqual(hit.json(), sampleProducts[0]);
+
+  await app.close();
+});
+
+test("GET /api/catalog/products/:id does not cache 404s", async () => {
+  const app = buildApp({
+    logger: false,
+    store: new MemoryProductStore(sampleProducts),
+    cache: new MemoryProductCache(),
+  });
+
+  const first = await app.inject({
+    method: "GET",
+    url: "/api/catalog/products/prod-missing",
+  });
+  const second = await app.inject({
+    method: "GET",
+    url: "/api/catalog/products/prod-missing",
+  });
+
+  assert.equal(first.statusCode, 404);
+  assert.equal(first.headers["x-cache"], "miss");
+  assert.equal(second.statusCode, 404);
+  assert.equal(second.headers["x-cache"], "miss");
+
+  await app.close();
+});
+
+test("GET /api/catalog/products fail-open when cache get throws", async () => {
+  const app = buildApp({
+    logger: false,
+    store: new MemoryProductStore(sampleProducts),
+    cache: {
+      async get() {
+        throw new Error("redis down");
+      },
+      async set() {},
+    },
+  });
+
+  const res = await app.inject({
+    method: "GET",
+    url: "/api/catalog/products",
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers["x-cache"], "miss");
+  assert.deepEqual(res.json(), { products: sampleProducts });
 
   await app.close();
 });
