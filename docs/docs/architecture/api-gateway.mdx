@@ -21,7 +21,7 @@ labels:
   - traefik.http.services.order-api.loadbalancer.server.port=3002
 ```
 
-Product detail, analytics, TLS, and rate limiting are not wired yet.
+Analytics, TLS, and rate limiting are not wired yet.
 
 ## Responsibilities
 
@@ -43,7 +43,7 @@ Traefik integrates natively with Docker Compose via container labels. Adding a n
 | Path prefix | Upstream | Status |
 |-------------|----------------|--------|
 | `/api/orders/*` | order-api | **Built** |
-| `/api/catalog/*` | catalog-api | **Built** (list from Mongo; no nginx yet) |
+| `/api/catalog/*` | catalog-api | **Built** (list/detail from Mongo; no nginx yet) |
 | `/api/analytics/*` | analytics-api | Planned |
 | `/docs/*` | docs-site (static build) | Planned |
 

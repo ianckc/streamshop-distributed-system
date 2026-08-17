@@ -44,5 +44,23 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     }
   });
 
+  app.get<{ Params: { id: string } }>(
+    "/api/catalog/products/:id",
+    async (request, reply) => {
+      try {
+        const product = await options.store.getProduct(request.params.id);
+        if (!product) {
+          const body: ErrorResponse = { error: "product not found" };
+          return reply.code(404).send(body);
+        }
+        return product;
+      } catch (err) {
+        request.log.error(err);
+        const body: ErrorResponse = { error: "failed to get product" };
+        return reply.code(503).send(body);
+      }
+    },
+  );
+
   return app;
 }

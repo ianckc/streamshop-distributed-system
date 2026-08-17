@@ -11,4 +11,8 @@ export class MemoryProductStore implements ProductStore {
   async listProducts(): Promise<Product[]> {
     return this.#products;
   }
+
+  async getProduct(id: string): Promise<Product | undefined> {
+    return this.#products.find((product) => product.id === id);
+  }
 }

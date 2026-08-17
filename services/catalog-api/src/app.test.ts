@@ -52,6 +52,9 @@ test("GET /api/catalog/products returns 503 when the store fails", async () => {
       async listProducts() {
         throw new Error("mongo unavailable");
       },
+      async getProduct() {
+        throw new Error("mongo unavailable");
+      },
     },
   });
 
@@ -59,6 +62,65 @@ test("GET /api/catalog/products returns 503 when the store fails", async () => {
 
   assert.equal(res.statusCode, 503);
   assert.deepEqual(res.json(), { error: "failed to list products" });
+
+  await app.close();
+});
+
+test("GET /api/catalog/products/:id returns a product from the store", async () => {
+  const app = buildApp({
+    logger: false,
+    store: new MemoryProductStore(sampleProducts),
+  });
+
+  const res = await app.inject({
+    method: "GET",
+    url: "/api/catalog/products/prod-001",
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers["content-type"], "application/json; charset=utf-8");
+  assert.deepEqual(res.json(), sampleProducts[0]);
+
+  await app.close();
+});
+
+test("GET /api/catalog/products/:id returns 404 when missing", async () => {
+  const app = buildApp({
+    logger: false,
+    store: new MemoryProductStore(sampleProducts),
+  });
+
+  const res = await app.inject({
+    method: "GET",
+    url: "/api/catalog/products/prod-missing",
+  });
+
+  assert.equal(res.statusCode, 404);
+  assert.deepEqual(res.json(), { error: "product not found" });
+
+  await app.close();
+});
+
+test("GET /api/catalog/products/:id returns 503 when the store fails", async () => {
+  const app = buildApp({
+    logger: false,
+    store: {
+      async listProducts() {
+        return [];
+      },
+      async getProduct() {
+        throw new Error("mongo unavailable");
+      },
+    },
+  });
+
+  const res = await app.inject({
+    method: "GET",
+    url: "/api/catalog/products/prod-001",
+  });
+
+  assert.equal(res.statusCode, 503);
+  assert.deepEqual(res.json(), { error: "failed to get product" });
 
   await app.close();
 });

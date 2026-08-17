@@ -15,7 +15,7 @@ sidebar_position: 1
 |-----------|--------|
 | Traefik v3 | `:8080` → `/api/orders`, `/api/catalog`; dashboard `:8081` |
 | `order-api` (Go) | `GET /health`, `POST /api/orders` |
-| `catalog-api` (Node) | `GET /health`, `GET /api/catalog/products` |
+| `catalog-api` (Node) | `GET /health`, `GET /api/catalog/products`, `GET /api/catalog/products/:id` |
 | PostgreSQL 18 | Order persistence |
 | MongoDB 8 | Product catalog |
 | Kafka, analytics, observability | Not yet |
@@ -61,6 +61,12 @@ curl http://localhost:8080/api/catalog/products
 
 Data is seeded into MongoDB on first start. See [catalog-api](../services/catalog-api).
 
+### Get one product (via Traefik)
+
+```bash
+curl http://localhost:8080/api/catalog/products/prod-001
+```
+
 ### Stop
 
 ```bash
@@ -92,7 +98,7 @@ curl http://localhost:8080/api/analytics/orders/summary
 ## Next steps
 
 - [order-api](../services/order-api) — endpoints and configuration
-- [catalog-api](../services/catalog-api) — health and product list
+- [catalog-api](../services/catalog-api) — health, list, and detail
 - [Order placement flow](../data-flows/order-placement) — what's built vs planned
 - [Architecture overview](../architecture/overview)
 - [Local development](../development/local-setup)

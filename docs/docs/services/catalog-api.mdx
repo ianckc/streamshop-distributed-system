@@ -12,8 +12,8 @@ Node.js HTTP service for the product catalog.
 |---------|--------|
 | `GET /health` | Implemented |
 | `GET /api/catalog/products` | Implemented |
+| `GET /api/catalog/products/:id` | Implemented |
 | MongoDB persistence | Implemented |
-| Product detail | Planned |
 | Redis cache-aside | Planned |
 | MinIO image upload | Planned |
 | Nginx replicas | Planned |
@@ -36,7 +36,7 @@ cp .env.example .env   # optional
 docker compose up --build
 ```
 
-Starts **Traefik**, **mongo**, **postgres**, **order-api**, and **catalog-api**. Health is at `http://localhost:3001/health`. List products through Traefik at `http://localhost:8080/api/catalog/products`.
+Starts **Traefik**, **mongo**, **postgres**, **order-api**, and **catalog-api**. Health is at `http://localhost:3001/health`. Products: `http://localhost:8080/api/catalog/products` and `http://localhost:8080/api/catalog/products/prod-001`.
 
 ## Endpoints
 
@@ -76,6 +76,28 @@ curl http://localhost:8080/api/catalog/products
 `id` values match `product_id` on `POST /api/orders` (e.g. `prod-001`). In Mongo the public id is stored as `_id`. `attributes` is a free-form string map.
 
 Mongo unavailable → `503` `{"error":"failed to list products"}`.
+
+### `GET /api/catalog/products/:id`
+
+Returns one product. Same JSON shape as an item in the list.
+
+```bash
+curl http://localhost:8080/api/catalog/products/prod-001
+```
+
+```json
+{
+  "id": "prod-001",
+  "name": "StreamShop Mug",
+  "price_pence": 1999,
+  "attributes": { "colour": "navy", "material": "ceramic" }
+}
+```
+
+| Status | When |
+|--------|------|
+| `404` | Unknown id |
+| `503` | Mongo unavailable |
 
 ### Inspect Mongo
 
