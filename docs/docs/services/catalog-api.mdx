@@ -16,7 +16,7 @@ Node.js HTTP service for the product catalog.
 | `GET /api/catalog/products/:id` | Implemented |
 | MongoDB persistence | Implemented |
 | Redis cache-aside | Implemented (60s TTL; fail-open) |
-| MinIO image upload | Planned |
+| MinIO image upload | Planned (MinIO is in Compose) |
 | Nginx replicas | Implemented (2 behind nginx, round_robin) |
 
 ## Stack
@@ -38,7 +38,7 @@ cp .env.example .env   # optional
 docker compose up --build
 ```
 
-Starts **Traefik**, **nginx**, **mongo**, **redis**, **redisinsight**, **postgres**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Health/ready: `http://localhost:3001/health` (replica 1) and `http://localhost:3011/health` (replica 2). Products via Traefik → nginx: `http://localhost:8080/api/catalog/products`.
+Starts **Traefik**, **nginx**, **mongo**, **redis**, **redisinsight**, **minio**, **postgres**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Health/ready: `http://localhost:3001/health` (replica 1) and `http://localhost:3011/health` (replica 2). Products via Traefik → nginx: `http://localhost:8080/api/catalog/products`.
 
 ## Endpoints
 
@@ -133,6 +133,14 @@ docker compose exec redis redis-cli GET catalog:products
 ```
 
 Redis Insight (local GUI, not behind Traefik): [http://localhost:5540](http://localhost:5540). Hit list or detail once, then inspect `catalog:products` and `catalog:product:prod-001`.
+
+### Inspect MinIO
+
+MinIO console (not behind Traefik): [http://localhost:9001](http://localhost:9001) (`streamshop` / `streamshop`). S3 API: `http://localhost:9000`. Catalog-api does not upload yet; no buckets are created in this slice.
+
+```bash
+curl -sI http://localhost:9000/minio/health/live
+```
 
 ## Configuration
 

@@ -101,7 +101,13 @@ S3-compatible object storage for binary assets.
 | `product-images` | Product photos | Presigned GET URLs |
 | `exports` | CSV analytics exports | Internal only |
 
-**Accessed by:** `catalog-api` (upload), `analytics-api` (export, optional)
+**Accessed by:** `catalog-api` (upload planned), `analytics-api` (export, optional)
+
+**Today:** MinIO runs in Compose. S3 API on `:9000`, console on `:9001` (user/password `streamshop` / `streamshop`). Data is stored on the `minio_data` volume. No buckets are created yet, and catalog-api does not upload. Image upload is the next catalog slice.
+
+```bash
+curl -sI http://localhost:9000/minio/health/live
+```
 
 ## Why not one database?
 
