@@ -10,18 +10,18 @@ StreamShop is polyglot by design — each language handles a role that fits its 
 
 | Service | Language | Framework | Port | Replicas | Status |
 |---------|----------|-----------|------|----------|--------|
-| `catalog-api` | Node.js 22 + TypeScript | Fastify | 3001 | 2 | **Built** (health only) |
+| `catalog-api` | Node.js 22 + TypeScript | Fastify | 3001 | 2 | **Built** (health + in-memory list) |
 | `order-api` | Go 1.26 | stdlib `net/http` | 3002 | 1 | **Built** |
 | `analytics-api` | Python 3.12 | FastAPI | 3003 | 1 | Planned |
 | `event-processor` | Rust | Axum + rdkafka | 3004 | 1 | Planned |
 
 ## catalog-api (Node.js + TypeScript)
 
-**Status:** **Implemented** (health only).
+**Status:** **Implemented** (health + in-memory product list).
 
 **Responsibility:** Product CRUD, image upload URLs, Redis cache-aside *(planned)*.
 
-- Endpoints: `GET /health`
+- Endpoints: `GET /health`, `GET /api/catalog/products`
 - Planned: MongoDB (products), MinIO (images), Redis cache-aside
 - Why Node.js: Fast I/O for HTTP-heavy read workloads; rich AWS SDK for MinIO
 

@@ -11,7 +11,8 @@ Node.js HTTP service for the product catalog.
 | Feature | Status |
 |---------|--------|
 | `GET /health` | Implemented |
-| Product list/detail | Planned |
+| `GET /api/catalog/products` | Implemented (in-memory) |
+| Product detail | Planned |
 | MongoDB | Planned |
 | Redis cache-aside | Planned |
 | MinIO image upload | Planned |
@@ -34,7 +35,7 @@ cp .env.example .env   # optional
 docker compose up --build
 ```
 
-Starts **Traefik**, **postgres**, **order-api**, and **catalog-api**. Health is at `http://localhost:3001/health`. Traefik routes `/api/catalog` to this service; product endpoints are not implemented yet.
+Starts **Traefik**, **postgres**, **order-api**, and **catalog-api**. Health is at `http://localhost:3001/health`. List products through Traefik at `http://localhost:8080/api/catalog/products` (in-memory until Mongo).
 
 ## Endpoints
 
@@ -49,6 +50,29 @@ curl http://localhost:3001/health
 ```json
 {"status":"ok","service":"catalog-api"}
 ```
+
+### `GET /api/catalog/products`
+
+Returns the product catalog. Data is a hardcoded in-memory array until Mongo is added. Amounts are in **pence**.
+
+```bash
+curl http://localhost:8080/api/catalog/products
+```
+
+```json
+{
+  "products": [
+    {
+      "id": "prod-001",
+      "name": "StreamShop Mug",
+      "price_pence": 1999,
+      "attributes": { "colour": "navy", "material": "ceramic" }
+    }
+  ]
+}
+```
+
+`id` values match `product_id` on `POST /api/orders` (e.g. `prod-001`). `attributes` is a free-form string map so later Mongo documents can vary by product.
 
 ## Configuration
 
@@ -76,6 +100,7 @@ npm test
 
 ```
 src/app.ts       Fastify app and routes
+src/products.ts  Product type and in-memory catalog
 src/server.ts    HTTP listen entrypoint
-src/app.test.ts  Health handler tests
+src/app.test.ts  Handler tests
 ```

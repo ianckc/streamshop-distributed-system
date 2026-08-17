@@ -9,7 +9,7 @@ sidebar_position: 1
 | Service | Runtime | Status |
 |---------|---------|--------|
 | `order-api` | Go 1.26+ | **Built** |
-| `catalog-api` | Node.js 22 + TypeScript | **Built** (health) |
+| `catalog-api` | Node.js 22 + TypeScript | **Built** (health + list) |
 | `analytics-api` | Python 3.12 | Planned |
 | `event-processor` | Rust stable | Planned |
 
@@ -49,7 +49,7 @@ See [order-api](../services/order-api) for endpoints and configuration.
 
 ### With Docker Compose
 
-Included in `docker compose up --build`. Health: `http://localhost:3001/health`.
+Included in `docker compose up --build`. Health: `http://localhost:3001/health`. Product list: `http://localhost:8080/api/catalog/products`.
 
 ### App locally
 
