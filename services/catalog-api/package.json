@@ -1,0 +1,43 @@
+{
+  "name": "catalog-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/app.test.ts",
+    "test:coverage": "c8 npm test"
+  },
+  "dependencies": {
+    "fastify": "^5.6.0",
+    "mongodb": "^7.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "c8": "^12.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "c8": {
+    "all": true,
+    "include": [
+      "src/**/*.ts"
+    ],
+    "exclude": [
+      "src/**/*.test.ts",
+      "src/server.ts",
+      "src/products.ts",
+      "src/store.ts"
+    ],
+    "reporter": [
+      "text",
+      "html"
+    ],
+    "report-dir": "coverage"
+  }
+}

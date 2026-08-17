@@ -11,17 +11,22 @@ StreamShop is an event-driven commerce and analytics platform. The **target** ar
 ```mermaid
 flowchart LR
   Client[Client] --> Traefik[Traefik]
+  Client --> CatalogAPI[catalog-api]
   Client --> OrderAPI[order-api]
+  Traefik --> CatalogAPI
   Traefik --> OrderAPI
+  CatalogAPI --> Mongo[(MongoDB_8)]
   OrderAPI --> Postgres[(PostgreSQL_18)]
 ```
 
-- **Traefik** on `:8080` — path prefix `/api/orders` → order-api; dashboard on `:8081`
+- **Traefik** on `:8080` — `/api/orders` → order-api, `/api/catalog` → catalog-api; dashboard on `:8081`
+- **catalog-api** on `:3001` — `GET /health`, `GET /ready`, `GET /api/catalog/products`, `GET /api/catalog/products/:id` (also reachable directly)
 - **order-api** on `:3002` — `GET /health`, `POST /api/orders` (also reachable directly)
 - **PostgreSQL** — `orders` and `order_items` tables
-- No catalog, queue, or other services yet
+- **MongoDB** — `products` collection
+- No queue or other services yet
 
-Details: [order-api](../services/order-api), [Quick Start](../getting-started/quick-start).
+Details: [catalog-api](../services/catalog-api), [order-api](../services/order-api), [Quick Start](../getting-started/quick-start).
 
 ## Target architecture
 
@@ -91,7 +96,7 @@ Docker Compose with optional profiles:
 - **`minimal`** — gateway, core services, Postgres, Redis *(not yet defined)*
 - **`full`** — all databases, Redpanda, MinIO, observability *(not yet defined)*
 
-Today: `docker compose up` runs Traefik, postgres, and order-api.
+Today: `docker compose up` runs Traefik, postgres, mongo, order-api, and catalog-api.
 
 ## Service responsibilities (target)
 
@@ -102,18 +107,20 @@ Today: `docker compose up` runs Traefik, postgres, and order-api.
 | `event-processor` | ClickHouse, PostgreSQL (status) | Redpanda |
 | `analytics-api` | — (read-only) | ClickHouse, PostgreSQL |
 
+**catalog-api today:** `GET /health`, `GET /ready` (Mongo ping), `GET /api/catalog/products`, and `GET /api/catalog/products/:id`; Redis and MinIO are not wired yet.
+
 **order-api today:** writes to PostgreSQL only; exposes `GET /health` (no `/ready`, tracing, or metrics yet).
 
 ## Component index
 
 | Component | Technology | Doc | Status |
 |-----------|------------|-----|--------|
-| API Gateway | Traefik v3 | [API Gateway](./api-gateway) | **Built** (`/api/orders` only) |
+| API Gateway | Traefik v3 | [API Gateway](./api-gateway) | **Built** (`/api/orders`, `/api/catalog`) |
 | Load Balancer | nginx | [Load Balancing](./load-balancing) | Planned |
 | Cache | Redis 7 | [Caching](./caching) | Planned |
 | Message Queue | Redpanda | [Messaging](./messaging) | Planned |
 | SQL (OLTP) | PostgreSQL 18 | [Storage](./storage) | **Built** |
-| NoSQL | MongoDB 7 | [Storage](./storage) | Planned |
+| NoSQL | MongoDB 8 | [Storage](./storage) | **Built** |
 | OLAP | ClickHouse 24 | [Storage](./storage) | Planned |
 | Object storage | MinIO | [Storage](./storage) | Planned |
 | Observability | OTel, Jaeger, Prometheus, Grafana | [Observability](./observability) | Planned |

@@ -1,0 +1,164 @@
+---
+sidebar_position: 2
+---
+
+# catalog-api
+
+Node.js HTTP service for the product catalog.
+
+## Status
+
+| Feature | Status |
+|---------|--------|
+| `GET /health` | Implemented |
+| `GET /ready` | Implemented |
+| `GET /api/catalog/products` | Implemented |
+| `GET /api/catalog/products/:id` | Implemented |
+| MongoDB persistence | Implemented |
+| Redis cache-aside | Planned |
+| MinIO image upload | Planned |
+| Nginx replicas | Planned |
+
+## Stack
+
+| | |
+|--|--|
+| Language | Node.js 22 + TypeScript |
+| HTTP | Fastify 5 |
+| Database | MongoDB 8 via official driver |
+| Port | `3001` (default) |
+
+## Run with Docker Compose
+
+From the repository root:
+
+```bash
+cp .env.example .env   # optional
+docker compose up --build
+```
+
+Starts **Traefik**, **mongo**, **postgres**, **order-api**, and **catalog-api**. Health/ready: `http://localhost:3001/health` and `http://localhost:3001/ready`. Products: `http://localhost:8080/api/catalog/products` and `http://localhost:8080/api/catalog/products/prod-001`.
+
+## Endpoints
+
+### `GET /health`
+
+Liveness check.
+
+```bash
+curl http://localhost:3001/health
+```
+
+```json
+{"status":"ok","service":"catalog-api"}
+```
+
+### `GET /ready`
+
+Readiness check: pings MongoDB. Use this to decide if the instance can serve traffic. Compose still healthchecks `/health` (process up).
+
+```bash
+curl http://localhost:3001/ready
+```
+
+```json
+{"status":"ok","service":"catalog-api"}
+```
+
+Mongo unavailable → `503` `{"error":"not ready"}`.
+
+### `GET /api/catalog/products`
+
+Returns the product catalog from MongoDB (`products` collection). Amounts are in **pence**.
+
+```bash
+curl http://localhost:8080/api/catalog/products
+```
+
+```json
+{
+  "products": [
+    {
+      "id": "prod-001",
+      "name": "StreamShop Mug",
+      "price_pence": 1999,
+      "attributes": { "colour": "navy", "material": "ceramic" }
+    }
+  ]
+}
+```
+
+`id` values match `product_id` on `POST /api/orders` (e.g. `prod-001`). In Mongo the public id is stored as `_id`. `attributes` is a free-form string map.
+
+Mongo unavailable → `503` `{"error":"failed to list products"}`.
+
+### `GET /api/catalog/products/:id`
+
+Returns one product. Same JSON shape as an item in the list.
+
+```bash
+curl http://localhost:8080/api/catalog/products/prod-001
+```
+
+```json
+{
+  "id": "prod-001",
+  "name": "StreamShop Mug",
+  "price_pence": 1999,
+  "attributes": { "colour": "navy", "material": "ceramic" }
+}
+```
+
+| Status | When |
+|--------|------|
+| `404` | Unknown id |
+| `503` | Mongo unavailable |
+
+### Inspect Mongo
+
+```bash
+docker compose exec mongo mongosh streamshop --eval 'db.products.find().pretty()'
+```
+
+Seed data is loaded from `infra/mongo/seed.js` on first start of an empty volume. Reset with `docker compose down -v`.
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3001` | HTTP listen port |
+| `SERVICE_NAME` | `catalog-api` | Shown in health response |
+| `MONGODB_URI` | *(required)* | MongoDB connection string |
+
+## Local development (without running the app in Docker)
+
+```bash
+docker compose up -d mongo
+cd services/catalog-api
+cp .env.example .env
+npm install
+npm start
+```
+
+`MONGODB_URI` in `.env.example` points at `localhost:27017`. Inside Compose the hostname is `mongo`.
+
+## Tests
+
+```bash
+npm test
+npm run test:coverage
+```
+
+Handler tests use an in-memory fake store — no Mongo required. Coverage is printed in the terminal; HTML is written to `coverage/index.html`. Excluded: `src/server.ts` (process entrypoint) and type-only modules. `src/store/mongo.ts` stays in the report at 0% until Mongo is tested (mock or Testcontainers).
+
+## Project layout
+
+```
+src/app.ts            Fastify app and routes
+src/products.ts       Product type
+src/store.ts          ProductStore interface
+src/store/memory.ts   In-memory store (tests)
+src/store/mongo.ts    MongoDB store
+src/server.ts         HTTP listen entrypoint
+src/app.test.ts       Handler tests
+```
