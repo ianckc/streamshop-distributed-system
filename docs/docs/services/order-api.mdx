@@ -12,6 +12,7 @@ Go HTTP service for creating orders and persisting them to PostgreSQL.
 |---------|--------|
 | `GET /health` | Implemented |
 | `POST /api/orders` | Implemented |
+| Traefik route (`/api/orders` on `:8080`) | Implemented |
 | Postgres persistence (`orders`, `order_items`) | Implemented |
 | Redpanda event publishing | Planned |
 | Redis idempotency keys | Planned |
@@ -36,7 +37,7 @@ cp .env.example .env   # optional
 docker compose up --build
 ```
 
-Starts **postgres** and **order-api**. The API is at `http://localhost:3002` (no Traefik yet).
+Starts **Traefik**, **postgres**, and **order-api**. Place orders at `http://localhost:8080/api/orders`. The service is also on `http://localhost:3002` for health checks and local debugging.
 
 ## Endpoints
 
@@ -100,7 +101,7 @@ Create an order. Amounts are in **pence** (GBP minor units).
 | `503` | Database error |
 
 ```bash
-curl -s -X POST http://localhost:3002/api/orders \
+curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' \
   -d '{
     "user_id": "660e8400-e29b-41d4-a716-446655440001",

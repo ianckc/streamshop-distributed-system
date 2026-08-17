@@ -4,27 +4,30 @@ sidebar_position: 1
 
 # Order Placement
 
-End-to-end order flow from HTTP request to analytics row. **Only the sync Postgres write is implemented today** — the rest is the target design.
+End-to-end order flow from HTTP request to analytics row. **Traefik routing and the sync Postgres write are implemented today** — the rest is the target design.
 
 ## Implemented today
 
 ```mermaid
 sequenceDiagram
   participant Client
+  participant Traefik
   participant OrderAPI as order-api_Go
   participant Postgres
 
-  Client->>OrderAPI: POST /api/orders
+  Client->>Traefik: POST /api/orders
+  Traefik->>OrderAPI: forward request
   OrderAPI->>OrderAPI: validate JSON
   OrderAPI->>Postgres: BEGIN transaction, insert order and items
   Postgres-->>OrderAPI: committed
-  OrderAPI-->>Client: 201 Created with order_id
+  OrderAPI-->>Traefik: 201 Created with order_id
+  Traefik-->>Client: 201 Created with order_id
 ```
 
 ### Try it
 
 ```bash
-curl -s -X POST http://localhost:3002/api/orders \
+curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' \
   -d '{
     "user_id": "660e8400-e29b-41d4-a716-446655440001",
@@ -41,7 +44,7 @@ What happens:
 3. Order + line items inserted in one Postgres transaction
 4. `201` response with order JSON (`status: "pending"`)
 
-Not implemented yet: Traefik, idempotency keys, Redpanda, async processor, analytics.
+Not implemented yet: idempotency keys, Redpanda, async processor, analytics.
 
 Full API details: [order-api](../services/order-api).
 

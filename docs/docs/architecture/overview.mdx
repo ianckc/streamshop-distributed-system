@@ -10,13 +10,16 @@ StreamShop is an event-driven commerce and analytics platform. The **target** ar
 
 ```mermaid
 flowchart LR
-  Client[Client] --> OrderAPI[order-api]
+  Client[Client] --> Traefik[Traefik]
+  Client --> OrderAPI[order-api]
+  Traefik --> OrderAPI
   OrderAPI --> Postgres[(PostgreSQL_18)]
 ```
 
-- **order-api** on `:3002` — `GET /health`, `POST /api/orders`
+- **Traefik** on `:8080` — path prefix `/api/orders` → order-api; dashboard on `:8081`
+- **order-api** on `:3002` — `GET /health`, `POST /api/orders` (also reachable directly)
 - **PostgreSQL** — `orders` and `order_items` tables
-- No gateway, queue, or other services yet
+- No catalog, queue, or other services yet
 
 Details: [order-api](../services/order-api), [Quick Start](../getting-started/quick-start).
 
@@ -88,7 +91,7 @@ Docker Compose with optional profiles:
 - **`minimal`** — gateway, core services, Postgres, Redis *(not yet defined)*
 - **`full`** — all databases, Redpanda, MinIO, observability *(not yet defined)*
 
-Today: `docker compose up` runs postgres + order-api only.
+Today: `docker compose up` runs Traefik, postgres, and order-api.
 
 ## Service responsibilities (target)
 
@@ -105,7 +108,7 @@ Today: `docker compose up` runs postgres + order-api only.
 
 | Component | Technology | Doc | Status |
 |-----------|------------|-----|--------|
-| API Gateway | Traefik v3 | [API Gateway](./api-gateway) | Planned |
+| API Gateway | Traefik v3 | [API Gateway](./api-gateway) | **Built** (`/api/orders` only) |
 | Load Balancer | nginx | [Load Balancing](./load-balancing) | Planned |
 | Cache | Redis 7 | [Caching](./caching) | Planned |
 | Message Queue | Redpanda | [Messaging](./messaging) | Planned |
