@@ -33,6 +33,7 @@ flowchart LR
 - **MongoDB** — `products` collection
 - **Redis** — cache-aside for catalog list/detail (TTL 60s; fail-open)
 - **Redis Insight** on `:5540` — local GUI; not behind Traefik
+- **MinIO** — S3 API `:9000`, console `:9001`; catalog-api does not upload yet
 - No queue or other services yet
 
 Details: [catalog-api](../services/catalog-api), [order-api](../services/order-api), [Quick Start](../getting-started/quick-start).
@@ -105,7 +106,7 @@ Docker Compose with optional profiles:
 - **`minimal`** — gateway, core services, Postgres, Redis *(not yet defined)*
 - **`full`** — all databases, Redpanda, MinIO, observability *(not yet defined)*
 
-Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisinsight, order-api, catalog-api-1, and catalog-api-2.
+Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisinsight, minio, order-api, catalog-api-1, and catalog-api-2.
 
 ## Service responsibilities (target)
 
@@ -116,7 +117,7 @@ Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisins
 | `event-processor` | ClickHouse, PostgreSQL (status) | Redpanda |
 | `analytics-api` | — (read-only) | ClickHouse, PostgreSQL |
 
-**catalog-api today:** two replicas behind nginx; `GET /health`, `GET /ready` (Mongo ping), `GET /api/catalog/products`, and `GET /api/catalog/products/:id` with Redis cache-aside; MinIO is not wired yet.
+**catalog-api today:** two replicas behind nginx; `GET /health`, `GET /ready` (Mongo ping), `GET /api/catalog/products`, and `GET /api/catalog/products/:id` with Redis cache-aside; MinIO is in Compose but not wired yet.
 
 **order-api today:** writes to PostgreSQL only; exposes `GET /health`, `GET /ready` (Postgres ping), and `POST /api/orders` (no tracing or metrics yet).
 
@@ -131,7 +132,7 @@ Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisins
 | SQL (OLTP) | PostgreSQL 18 | [Storage](./storage) | **Built** |
 | NoSQL | MongoDB 8 | [Storage](./storage) | **Built** |
 | OLAP | ClickHouse 24 | [Storage](./storage) | Planned |
-| Object storage | MinIO | [Storage](./storage) | Planned |
+| Object storage | MinIO | [Storage](./storage) | **Built** (Compose only; upload planned) |
 | Observability | OTel, Jaeger, Prometheus, Grafana | [Observability](./observability) | Planned |
 
 ## User journeys (target)
