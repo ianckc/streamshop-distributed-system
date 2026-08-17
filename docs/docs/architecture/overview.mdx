@@ -26,6 +26,9 @@ flowchart LR
   Catalog2 --> MinIO
   OrderAPI --> Postgres[(PostgreSQL_18)]
   OrderAPI --> Redpanda[Redpanda]
+  Redpanda --> Processor[event-processor]
+  Processor --> ClickHouse[(ClickHouse_24)]
+  Processor --> Postgres
 ```
 
 - **Traefik** on `:8080` — `/api/orders` → order-api, `/api/catalog` → nginx → catalog replicas; dashboard on `:8081`
@@ -39,8 +42,10 @@ flowchart LR
 - **MinIO** — S3 API `:9000`, console `:9001`; buckets `product-images` and `exports`; catalog-api returns presigned `image_url` on product reads (upload via API is planned)
 - **Redpanda** v26.2.1 — Kafka API `:19092` (host), `redpanda:9092` (Compose); `orders.events` from order-api
 - **Redpanda Console** on `:8082` — local GUI for topics and messages; not behind Traefik
+- **event-processor** on `:3004` — consumes `order.created`, writes ClickHouse, marks orders `processed`
+- **ClickHouse** HTTP `:8123` — `order_events` (native port not published; MinIO uses `:9000`)
 
-Details: [catalog-api](../services/catalog-api), [order-api](../services/order-api), [Quick Start](../getting-started/quick-start).
+Details: [catalog-api](../services/catalog-api), [order-api](../services/order-api), [event-processor](../services/event-processor), [Quick Start](../getting-started/quick-start).
 
 ## Target architecture
 
@@ -110,7 +115,7 @@ Docker Compose with optional profiles:
 - **`minimal`** — gateway, core services, Postgres, Redis *(not yet defined)*
 - **`full`** — all databases, Redpanda, MinIO, observability *(not yet defined)*
 
-Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisinsight, minio, redpanda, redpanda-console, order-api, catalog-api-1, and catalog-api-2.
+Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisinsight, minio, redpanda, redpanda-console, clickhouse, event-processor, order-api, catalog-api-1, and catalog-api-2.
 
 ## Service responsibilities (target)
 
@@ -125,6 +130,8 @@ Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisins
 
 **order-api today:** writes to PostgreSQL then publishes `order.created` to `orders.events` (fail-open); exposes `GET /health`, `GET /ready` (Postgres ping), and `POST /api/orders` (no tracing or metrics yet).
 
+**event-processor today:** consumes `orders.events`, inserts ClickHouse `order_events`, sets Postgres `orders.status = processed`, then commits the offset. Invalid payloads go to `orders.events.dlq`.
+
 ## Component index
 
 | Component | Technology | Doc | Status |
@@ -132,10 +139,10 @@ Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisins
 | API Gateway | Traefik v3 | [API Gateway](./api-gateway) | **Built** (`/api/orders`, `/api/catalog`) |
 | Load Balancer | nginx | [Load Balancing](./load-balancing) | **Built** (2× catalog-api) |
 | Cache | Redis 8 | [Caching](./caching) | **Built** (cache-aside, 60s TTL) |
-| Message Queue | Redpanda | [Messaging](./messaging) | **Built** (`order.created` produce) |
+| Message Queue | Redpanda | [Messaging](./messaging) | **Built** (produce + consume) |
 | SQL (OLTP) | PostgreSQL 18 | [Storage](./storage) | **Built** |
 | NoSQL | MongoDB 8 | [Storage](./storage) | **Built** |
-| OLAP | ClickHouse 24 | [Storage](./storage) | Planned |
+| OLAP | ClickHouse 24 | [Storage](./storage) | **Built** (`order_events` writes) |
 | Object storage | MinIO | [Storage](./storage) | **Built** (presigned GET on catalog reads) |
 | Observability | OTel, Jaeger, Prometheus, Grafana | [Observability](./observability) | Planned |
 
@@ -143,8 +150,8 @@ Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisins
 
 1. **Browse catalog** — cached product list behind nginx (2 replicas)
 2. **Upload product image** — MinIO via catalog-api
-3. **Place order** — Go service writes to Postgres, publishes `order.created` *(consume/analytics not built)*
-4. **Async processing** — Rust consumer → ClickHouse
+3. **Place order** — Go service writes to Postgres, publishes `order.created`
+4. **Async processing** — Rust consumer → ClickHouse + `processed` *(analytics API not built)*
 5. **Analytics** — Python queries ClickHouse + Postgres
 
 See [Order Placement](../data-flows/order-placement) for the full flow and what's implemented.

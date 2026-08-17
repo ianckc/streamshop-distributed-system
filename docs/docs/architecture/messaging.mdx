@@ -10,9 +10,9 @@ StreamShop uses **Redpanda** as its message broker — a Kafka-compatible event 
 
 Redpanda **v26.2.1** runs in Compose (`streamshop-redpanda`). Kafka API from the host is `localhost:19092`; other Compose services use `redpanda:9092`. Admin API is `localhost:9644`. Data is stored on the `redpanda_data` volume. `--mode dev-container` and `--smp 1` keep it suitable for a laptop. Not behind Traefik.
 
-After `POST /api/orders` commits to Postgres, order-api publishes `order.created` to `orders.events` (auto-created on first produce). Produce failures are logged; the HTTP response is still `201`. There is no consumer yet.
+After `POST /api/orders` commits to Postgres, order-api publishes `order.created` to `orders.events`. event-processor consumes the topic (group `event-processor`), writes ClickHouse, marks the order `processed`, then commits the offset. Invalid payloads go to `orders.events.dlq`.
 
-Redpanda Console is a local debug GUI on [http://localhost:8082](http://localhost:8082) (not behind Traefik). Place an order, then open topic `orders.events`.
+Redpanda Console is a local debug GUI on [http://localhost:8082](http://localhost:8082) (not behind Traefik).
 
 ```bash
 curl -s -X POST http://localhost:8080/api/orders \
@@ -35,11 +35,11 @@ docker compose exec redpanda rpk topic consume orders.events --num 1
 | Topic | Status | Purpose |
 |-------|--------|---------|
 | `orders.events` | **Built** (auto-created on first produce) | Order lifecycle events |
-| `orders.events.dlq` | Planned | Poison messages after max retries |
+| `orders.events.dlq` | **Built** (invalid payloads) | Poison messages |
 
 ## Event schema
 
-order-api publishes this JSON (schema validation in the consumer is planned):
+order-api publishes this JSON; event-processor validates it with serde (required fields, `event_type`, non-empty `items`):
 
 ```json
 {
@@ -59,20 +59,15 @@ order-api publishes this JSON (schema validation in the consumer is planned):
 | Role | Service | Client library | Status |
 |------|---------|----------------|--------|
 | Producer | `order-api` (Go) | kafka-go | **Built** |
-| Consumer | `event-processor` (Rust) | rust-rdkafka | Planned |
+| Consumer | `event-processor` (Rust) | rust-rdkafka | **Built** |
 
 ## Delivery semantics
 
-**Today:** order-api writes to Postgres, then publishes. If produce fails, the order still exists (`201`, error logged). That is a dual-write gap — an outbox is planned, not built.
+**Today (consume path):** event-processor is at-least-once. Offset commits after ClickHouse insert and Postgres status update. Storage failures retry the same message. Invalid JSON goes to `orders.events.dlq` then the offset is committed.
 
-**Target** (at-least-once, once a consumer exists):
+**Today (produce path):** order-api writes to Postgres, then publishes. If produce fails, the order still exists (`201`, error logged). That is a dual-write gap — an outbox is planned, not built.
 
-1. `order-api` writes to Postgres in a transaction
-2. Publishes to Redpanda after commit
-3. `event-processor` consumes, writes to ClickHouse, then commits offset
-4. On failure, message is retried; after N failures, routed to DLQ
-
-Idempotency keys on the order API and idempotent writes in the processor prevent duplicate side effects.
+ReplacingMergeTree on `order_id` and an idempotent Postgres status update keep duplicate deliveries from stacking extra facts. HTTP idempotency keys are still planned.
 
 ## Consumer group
 

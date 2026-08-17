@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Order Placement
 
-End-to-end order flow from HTTP request to analytics row. **Traefik routing, the sync Postgres write, and `order.created` publish are implemented today** — the consumer and analytics are the target design.
+End-to-end order flow from HTTP request to a ClickHouse analytics row. **The write, publish, and consume path are implemented today** — the Python analytics API is still planned.
 
 ## Implemented today
 
@@ -15,6 +15,8 @@ sequenceDiagram
   participant OrderAPI as order-api_Go
   participant Postgres
   participant Redpanda
+  participant Processor as event-processor_Rust
+  participant ClickHouse
 
   Client->>Traefik: POST /api/orders
   Traefik->>OrderAPI: forward request
@@ -24,6 +26,10 @@ sequenceDiagram
   OrderAPI->>Redpanda: publish order.created
   OrderAPI-->>Traefik: 201 Created with order_id
   Traefik-->>Client: 201 Created with order_id
+  Redpanda->>Processor: deliver order.created
+  Processor->>ClickHouse: INSERT order_events
+  Processor->>Postgres: UPDATE status processed
+  Processor->>Redpanda: commit offset
 ```
 
 ### Try it
@@ -46,8 +52,9 @@ What happens:
 3. Order + line items inserted in one Postgres transaction
 4. `order.created` published to `orders.events` (fail-open if Redpanda is down)
 5. `201` response with order JSON (`status: "pending"`)
+6. event-processor inserts ClickHouse `order_events` and sets Postgres status to `processed`
 
-Not implemented yet: idempotency keys, async processor, analytics.
+Not implemented yet: idempotency keys, analytics HTTP API.
 
 Full API details: [order-api](../services/order-api).
 
@@ -90,7 +97,7 @@ sequenceDiagram
 
 - **Idempotency** — `Idempotency-Key` header + Redis *(not built)*
 - **Event publish** — `order.created` to Redpanda topic `orders.events` *(built; fail-open)*
-- **Async processing** — Rust consumer → ClickHouse + status update *(not built)*
+- **Async processing** — Rust consumer → ClickHouse + status update *(built)*
 - **Analytics** — `GET /api/analytics/orders/summary` via Traefik *(not built)*
 
 ### Planned failure behaviour
@@ -103,4 +110,4 @@ sequenceDiagram
 | Invalid event schema | Message to `orders.events.dlq` |
 | Duplicate idempotency key | Return original order |
 
-See [Runbooks](../runbooks/inspect-kafka-lag) when the event pipeline exists.
+See [Inspect Kafka lag](../runbooks/inspect-kafka-lag) if `orders.status` stays `pending`.

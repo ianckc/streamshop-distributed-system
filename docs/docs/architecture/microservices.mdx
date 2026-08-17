@@ -13,7 +13,7 @@ StreamShop is polyglot by design — each language handles a role that fits its 
 | `catalog-api` | Node.js 22 + TypeScript | Fastify | 3001 / 3011 | 2 | **Built** (nginx + Redis cache) |
 | `order-api` | Go 1.26 | stdlib `net/http` | 3002 | 1 | **Built** |
 | `analytics-api` | Python 3.12 | FastAPI | 3003 | 1 | Planned |
-| `event-processor` | Rust | Axum + rdkafka | 3004 | 1 | Planned |
+| `event-processor` | Rust | Axum + rdkafka | 3004 | 1 | **Built** |
 
 ## catalog-api (Node.js + TypeScript)
 
@@ -49,26 +49,32 @@ Full reference: [order-api service doc](../services/order-api).
 - Reads: ClickHouse (aggregates), PostgreSQL (order detail)
 - Why Python: FastAPI + clickhouse-driver for rapid analytics API development
 
-## event-processor (Rust) — planned
+## event-processor (Rust)
 
-**Responsibility:** Consume `orders.events`, validate schema, enrich, write ClickHouse + update Postgres status.
+**Status:** **Implemented** (consume `order.created` → ClickHouse + Postgres status).
 
-- Writes: ClickHouse (analytics facts), PostgreSQL (order status)
+**Responsibility:** Consume `orders.events`, validate payload, write ClickHouse, update order status.
+
+- Writes: ClickHouse (`order_events`); PostgreSQL (`orders.status`)
+- Endpoints: `GET /health`, `GET /ready`
+- Planned: analytics-api reads ClickHouse
 - Why Rust: Memory-safe, high-throughput consumer; ideal for always-on background processing
+
+Full reference: [event-processor service doc](../services/event-processor).
 
 ## Cross-cutting concerns
 
 **Target** for every service:
 
-| Concern | Standard | order-api today | catalog-api today |
-|---------|----------|-----------------|-------------------|
-| Health | `GET /health` | Yes | Yes |
-| Readiness | `GET /ready` | Yes | Yes |
-| Tracing | OpenTelemetry → Jaeger | No | No |
-| Metrics | Prometheus `/metrics` | No | No |
-| Logging | Structured JSON | Yes (slog) | Yes (pino via Fastify) |
-| Config | Env via Compose | Yes | Yes |
-| API spec | OpenAPI in `services/{name}/` | No | No |
+| Concern | Standard | order-api | catalog-api | event-processor |
+|---------|----------|-----------|-------------|-----------------|
+| Health | `GET /health` | Yes | Yes | Yes |
+| Readiness | `GET /ready` | Yes | Yes | Yes |
+| Tracing | OpenTelemetry → Jaeger | No | No | No |
+| Metrics | Prometheus `/metrics` | No | No | No |
+| Logging | Structured JSON | Yes (slog) | Yes (pino via Fastify) | Yes (tracing) |
+| Config | Env via Compose | Yes | Yes | Yes |
+| API spec | OpenAPI in `services/{name}/` | No | No | No |
 
 ## Service boundaries
 
@@ -79,8 +85,9 @@ flowchart LR
   Order[order-api] -->|owns| Postgres[(PostgreSQL)]
   Order -->|produces| Redpanda[Redpanda]
   Processor[event-processor] -->|owns writes| ClickHouse[(ClickHouse)]
+  Processor -->|status update| Postgres
   Analytics[analytics-api] -->|read-only| ClickHouse
   Analytics -->|read-only| Postgres
 ```
 
-No service writes to another service's primary datastore directly — all cross-service communication goes through HTTP or the message queue.
+No service writes to another service's primary datastore directly — all cross-service communication goes through HTTP or the message queue. event-processor is the documented exception: it updates `orders.status` after consuming `order.created`.

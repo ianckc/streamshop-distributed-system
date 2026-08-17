@@ -82,15 +82,22 @@ CREATE TABLE order_events (
   user_id      UUID,
   total_pence  UInt32,
   item_count   UInt8,
-  event_time   DateTime,
-  processed_at DateTime
-) ENGINE = MergeTree()
-ORDER BY (event_time, order_id);
+    event_time   DateTime64(3, 'UTC'),
+    processed_at DateTime64(3, 'UTC')
+) ENGINE = ReplacingMergeTree(processed_at)
+ORDER BY (order_id);
 ```
 
-Materialized views power hourly revenue aggregates queried by `analytics-api`.
+**Accessed by:** `event-processor` (writes), `analytics-api` (reads, planned)
 
-**Accessed by:** `event-processor` (writes), `analytics-api` (reads)
+**Today:** ClickHouse 24 runs in Compose. HTTP interface on `:8123` (native `:9000` is not published — MinIO uses that port). User/password `streamshop` / `streamshop`. Data is on the `clickhouse_data` volume. `infra/clickhouse/init.sql` creates `streamshop.order_events`. event-processor writes rows; analytics-api is not built.
+
+```bash
+curl -s http://localhost:8123/ping
+docker compose exec clickhouse \
+  clickhouse-client --user streamshop --password streamshop --database streamshop \
+  -q 'SELECT count() FROM order_events'
+```
 
 ## MinIO (Object storage)
 

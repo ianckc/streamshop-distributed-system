@@ -1,0 +1,145 @@
+---
+sidebar_position: 3
+---
+
+# event-processor
+
+Rust consumer for `order.created` events. It writes a denormalized fact to ClickHouse and marks the order `processed` in Postgres, then commits the Kafka offset.
+
+## Status
+
+| Feature | Status |
+|---------|--------|
+| `GET /health` | Implemented |
+| `GET /ready` | Implemented (Postgres + ClickHouse ping) |
+| Consume `orders.events` | Implemented |
+| ClickHouse `order_events` insert | Implemented |
+| Postgres status → `processed` | Implemented |
+| Invalid payload → `orders.events.dlq` | Implemented |
+| Analytics HTTP API | Planned (`analytics-api`) |
+| OpenTelemetry / metrics | Planned |
+
+## Stack
+
+| | |
+|--|--|
+| Language | Rust (stable) |
+| HTTP | Axum (`/health`, `/ready` only) |
+| Kafka | rust-rdkafka (`cmake-build`) |
+| OLAP | ClickHouse 24 (HTTP `:8123`) |
+| OLTP | PostgreSQL 18 via `tokio-postgres` |
+| Port | `3004` (not behind Traefik) |
+
+## Run with Docker Compose
+
+From the repository root:
+
+```bash
+docker compose up --build
+```
+
+Health/ready: `http://localhost:3004/health` and `http://localhost:3004/ready`.
+
+## Endpoints
+
+### `GET /health`
+
+Liveness check.
+
+```bash
+curl http://localhost:3004/health
+```
+
+```json
+{"status":"ok","service":"event-processor"}
+```
+
+### `GET /ready`
+
+Pings PostgreSQL and ClickHouse. Compose healthchecks `/health` (process up).
+
+```bash
+curl http://localhost:3004/ready
+```
+
+Postgres or ClickHouse unavailable → `503` `{"error":"not ready"}`.
+
+## What it does
+
+1. Joins consumer group `event-processor` on topic `orders.events` (`auto.offset.reset=earliest`)
+2. Parses `order.created` JSON (same shape as order-api produces)
+3. Inserts `streamshop.order_events` in ClickHouse (`ReplacingMergeTree` on `order_id`)
+4. `UPDATE orders SET status = 'processed' WHERE id = $1`
+5. Commits the Kafka offset **after** both writes
+
+Invalid JSON / schema → original payload to `orders.events.dlq`, then commit (do not retry forever). Storage errors → **do not** commit; retry the same message.
+
+## Demo
+
+Place an order, then inspect status and the analytics row:
+
+```bash
+curl -s -X POST http://localhost:8080/api/orders \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":"660e8400-e29b-41d4-a716-446655440001","items":[{"product_id":"prod-001","qty":2,"price_pence":1999}]}'
+
+docker compose exec postgres \
+  psql -U streamshop -d streamshop \
+  -c 'SELECT id, status, total_pence FROM orders ORDER BY created_at DESC LIMIT 5;'
+
+docker compose exec clickhouse \
+  clickhouse-client --user streamshop --password streamshop --database streamshop \
+  -q 'SELECT order_id, user_id, total_pence, item_count, event_time FROM order_events'
+```
+
+Redpanda Console: [http://localhost:8082](http://localhost:8082) — consumer group `event-processor`, topic `orders.events`.
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3004` | HTTP listen port |
+| `SERVICE_NAME` | `event-processor` | Shown in health/ready JSON |
+| `KAFKA_BROKERS` | *(required)* | Compose: `redpanda:9092`; host: `localhost:19092` |
+| `KAFKA_TOPIC` | `orders.events` | Input topic |
+| `KAFKA_DLQ_TOPIC` | `orders.events.dlq` | Invalid payloads |
+| `KAFKA_GROUP_ID` | `event-processor` | Consumer group |
+| `DATABASE_URL` | *(required)* | Postgres URL |
+| `CLICKHOUSE_URL` | *(required)* | HTTP interface (`http://clickhouse:8123`) |
+| `CLICKHOUSE_USER` | `streamshop` | ClickHouse user |
+| `CLICKHOUSE_PASSWORD` | `streamshop` | ClickHouse password |
+| `CLICKHOUSE_DATABASE` | `streamshop` | Database with `order_events` |
+
+## Local development (without running the app in Docker)
+
+Needs cmake (rdkafka). Easier to run the service in Compose. Unit tests do not need cmake, Kafka, or ClickHouse:
+
+```bash
+cd services/event-processor
+cargo test
+```
+
+`cargo test --features kafka` builds the rdkafka client (requires cmake).
+
+## Tests
+
+```bash
+cargo test
+cargo fmt --check
+```
+
+Handler/process tests use in-memory fakes.
+
+## Project layout
+
+```
+src/main.rs       HTTP + consumer loop
+src/lib.rs        Module root
+src/config.rs     Environment configuration
+src/event.rs      order.created JSON
+src/process.rs    ClickHouse then Postgres
+src/analytics.rs  ClickHouse client
+src/orders.rs     Postgres status update
+src/http.rs       /health and /ready
+src/consume.rs    rdkafka (feature kafka)
+```

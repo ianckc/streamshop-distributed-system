@@ -26,7 +26,7 @@ docker compose down
 docker compose down -v
 ```
 
-This deletes all Postgres, MongoDB, Redis Insight, MinIO, and Redpanda data.
+This deletes all Postgres, MongoDB, Redis Insight, MinIO, Redpanda, and ClickHouse data.
 
 ### 3. Restart and seed
 
@@ -56,7 +56,7 @@ Expected output: all health checks pass, sample order created and processed with
 |-------|---------|
 | PostgreSQL | `docker compose exec postgres psql -U streamshop -c 'TRUNCATE orders, order_items CASCADE'` |
 | MongoDB | `docker compose exec mongo mongosh streamshop --eval 'db.products.deleteMany({})'` |
-| ClickHouse | `docker compose exec clickhouse clickhouse-client -q 'TRUNCATE TABLE order_events'` |
+| ClickHouse | `docker compose exec clickhouse clickhouse-client --user streamshop --password streamshop --database streamshop -q 'TRUNCATE TABLE order_events'` |
 | Redis | `docker compose exec redis redis-cli FLUSHALL` |
 | MinIO | `docker compose exec minio mc rm --recursive --force local/product-images/` |
 
