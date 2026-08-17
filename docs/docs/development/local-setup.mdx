@@ -17,7 +17,7 @@ sidebar_position: 1
 
 ### With Docker Compose
 
-From the repo root — starts Traefik, Postgres, Mongo, order-api, and catalog-api:
+From the repo root — starts Traefik, Postgres, Mongo, Redis, order-api, and catalog-api:
 
 ```bash
 docker compose up --build
@@ -92,9 +92,10 @@ Future variables (not used yet): `KAFKA_BROKERS`, `REDIS_URL`, `OTEL_EXPORTER_OT
 PORT=3001
 SERVICE_NAME=catalog-api
 MONGODB_URI=mongodb://localhost:27017/streamshop
+REDIS_URL=redis://localhost:6379
 ```
 
-Copy from `services/catalog-api/.env.example`. `MONGODB_URI` is **required**.
+Copy from `services/catalog-api/.env.example`. `MONGODB_URI` is **required**. `REDIS_URL` is set for Compose; the app does not use it yet.
 
 ## Other services (planned)
 

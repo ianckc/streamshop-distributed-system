@@ -4,7 +4,7 @@ sidebar_position: 7
 
 # Storage
 
-StreamShop uses four distinct storage technologies, each chosen for a specific access pattern.
+StreamShop uses distinct storage technologies, each chosen for a specific access pattern.
 
 ## Storage map
 
@@ -14,7 +14,7 @@ StreamShop uses four distinct storage technologies, each chosen for a specific a
 | MongoDB | NoSQL | MongoDB 8 | Product catalog (flexible schema) |
 | ClickHouse | OLAP | ClickHouse 24 | Order event facts, aggregates |
 | MinIO | Object | MinIO (S3-compatible) | Product images, CSV exports |
-| Redis | Cache | Redis 7 | Hot reads, idempotency keys |
+| Redis | Cache | Redis 8 | Hot reads, idempotency keys |
 
 ## PostgreSQL (OLTP)
 
@@ -59,6 +59,16 @@ Document store for the product catalog. Products have variable attributes — co
 **Accessed by:** `catalog-api` (reads list and detail today; writes planned)
 
 Seed documents live in `infra/mongo/seed.js` and load on first start of an empty volume.
+
+## Redis (Cache)
+
+In-memory cache for hot catalog reads and (later) order idempotency keys. Redis is **not** a primary datastore — Mongo remains the source of truth. There is no Compose volume; cache is ephemeral by design.
+
+**Today:** Redis 8 runs in Compose on `:6379` (no password). catalog-api sets `REDIS_URL` but does not read or write Redis yet. Cache-aside is the next catalog slice. See [Caching](./caching).
+
+```bash
+docker compose exec redis redis-cli ping
+```
 
 ## ClickHouse (OLAP)
 

@@ -89,6 +89,19 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  redis:
+    image: redis:8-alpine
+    container_name: streamshop-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
   catalog-api:
     build:
       context: ./services/catalog-api
@@ -108,8 +121,11 @@ services:
       PORT: ${CATALOG_API_PORT:-3001}
       SERVICE_NAME: ${CATALOG_API_SERVICE_NAME:-catalog-api}
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/streamshop}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
     depends_on:
       mongo:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${PORT}/health || exit 1"]

@@ -16,6 +16,7 @@ flowchart LR
   Traefik --> CatalogAPI
   Traefik --> OrderAPI
   CatalogAPI --> Mongo[(MongoDB_8)]
+  CatalogAPI -.-> Redis[(Redis_8)]
   OrderAPI --> Postgres[(PostgreSQL_18)]
 ```
 
@@ -24,6 +25,7 @@ flowchart LR
 - **order-api** on `:3002` — `GET /health`, `POST /api/orders` (also reachable directly)
 - **PostgreSQL** — `orders` and `order_items` tables
 - **MongoDB** — `products` collection
+- **Redis** — running in Compose; catalog-api does not cache yet
 - No queue or other services yet
 
 Details: [catalog-api](../services/catalog-api), [order-api](../services/order-api), [Quick Start](../getting-started/quick-start).
@@ -96,7 +98,7 @@ Docker Compose with optional profiles:
 - **`minimal`** — gateway, core services, Postgres, Redis *(not yet defined)*
 - **`full`** — all databases, Redpanda, MinIO, observability *(not yet defined)*
 
-Today: `docker compose up` runs Traefik, postgres, mongo, order-api, and catalog-api.
+Today: `docker compose up` runs Traefik, postgres, mongo, redis, order-api, and catalog-api.
 
 ## Service responsibilities (target)
 
@@ -107,7 +109,7 @@ Today: `docker compose up` runs Traefik, postgres, mongo, order-api, and catalog
 | `event-processor` | ClickHouse, PostgreSQL (status) | Redpanda |
 | `analytics-api` | — (read-only) | ClickHouse, PostgreSQL |
 
-**catalog-api today:** `GET /health`, `GET /ready` (Mongo ping), `GET /api/catalog/products`, and `GET /api/catalog/products/:id`; Redis and MinIO are not wired yet.
+**catalog-api today:** `GET /health`, `GET /ready` (Mongo ping), `GET /api/catalog/products`, and `GET /api/catalog/products/:id`; Redis is in Compose but not used; MinIO is not wired yet.
 
 **order-api today:** writes to PostgreSQL only; exposes `GET /health` (no `/ready`, tracing, or metrics yet).
 
@@ -117,7 +119,7 @@ Today: `docker compose up` runs Traefik, postgres, mongo, order-api, and catalog
 |-----------|------------|-----|--------|
 | API Gateway | Traefik v3 | [API Gateway](./api-gateway) | **Built** (`/api/orders`, `/api/catalog`) |
 | Load Balancer | nginx | [Load Balancing](./load-balancing) | Planned |
-| Cache | Redis 7 | [Caching](./caching) | Planned |
+| Cache | Redis 8 | [Caching](./caching) | **Built** (Compose only; cache-aside planned) |
 | Message Queue | Redpanda | [Messaging](./messaging) | Planned |
 | SQL (OLTP) | PostgreSQL 18 | [Storage](./storage) | **Built** |
 | NoSQL | MongoDB 8 | [Storage](./storage) | **Built** |

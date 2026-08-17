@@ -4,7 +4,15 @@ sidebar_position: 4
 
 # Caching
 
-StreamShop uses **Redis 7** as an in-memory cache. Redis is never used as a primary datastore — this keeps the durable vs ephemeral storage story clear.
+StreamShop uses **Redis 8** as an in-memory cache. Redis is never used as a primary datastore — this keeps the durable vs ephemeral storage story clear.
+
+## What's running today
+
+Redis is in Docker Compose (`localhost:6379`, no password). **catalog-api does not read or write Redis yet** — product list/detail still hit Mongo on every request. Cache-aside is the next catalog slice.
+
+```bash
+docker compose exec redis redis-cli ping
+```
 
 ## Patterns
 
