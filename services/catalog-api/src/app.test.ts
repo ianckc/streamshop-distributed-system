@@ -38,6 +38,7 @@ test("GET /health returns ok", async () => {
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers["content-type"], "application/json; charset=utf-8");
+  assert.equal(res.headers["x-replica-id"], "catalog-api");
   assert.deepEqual(res.json(), { status: "ok", service: "catalog-api" });
 
   await app.close();

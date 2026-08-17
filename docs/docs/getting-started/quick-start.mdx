@@ -13,9 +13,10 @@ sidebar_position: 1
 
 | Component | Status |
 |-----------|--------|
-| Traefik v3 | `:8080` → `/api/orders`, `/api/catalog`; dashboard `:8081` |
-| `order-api` (Go) | `GET /health`, `POST /api/orders` |
-| `catalog-api` (Node) | `GET /health`, `GET /ready`, product list/detail |
+| Traefik v3 | `:8080` → `/api/orders`, `/api/catalog` (catalog via nginx); dashboard `:8081` |
+| nginx | Round-robin to 2× catalog-api |
+| `order-api` (Go) | `GET /health`, `GET /ready`, `POST /api/orders` |
+| `catalog-api` (Node) | 2 replicas; health, ready, product list/detail |
 | PostgreSQL 18 | Order persistence |
 | MongoDB 8 | Product catalog |
 | Redis 8 | Cache-aside for catalog list/detail (TTL 60s) |
@@ -31,14 +32,16 @@ cp .env.example .env   # optional — defaults work out of the box
 docker compose up --build
 ```
 
-This starts **Traefik**, **postgres**, **mongo**, **redis**, **redisinsight**, **order-api**, and **catalog-api**. Place orders and list products through the gateway on **:8080**; health and debug calls can still hit **:3001** / **:3002** directly. Redis Insight is on **:5540**.
+This starts **Traefik**, **nginx**, **postgres**, **mongo**, **redis**, **redisinsight**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Place orders and list products through the gateway on **:8080**; health and debug calls can still hit **:3001** / **:3011** / **:3002** directly. Redis Insight is on **:5540**.
 
 ### Health checks (direct)
 
 ```bash
-curl http://localhost:3001/health   # catalog-api liveness
-curl http://localhost:3001/ready    # catalog-api Mongo ping
-curl http://localhost:3002/health   # order-api
+curl http://localhost:3001/health   # catalog-api-1 liveness
+curl http://localhost:3001/ready    # catalog-api-1 Mongo ping
+curl http://localhost:3011/health   # catalog-api-2 liveness
+curl http://localhost:3002/health   # order-api liveness
+curl http://localhost:3002/ready    # order-api Postgres ping
 ```
 
 ### Create an order (via Traefik)
