@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ianckc/distributed-systems/services/order-api/internal/config"
+	"github.com/ianckc/distributed-systems/services/order-api/internal/events"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/handler"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/store/postgres"
 )
@@ -35,7 +36,13 @@ func main() {
 	defer pool.Close()
 
 	orderStore := postgres.NewOrderStore(pool)
-	orderHandler := handler.OrderHandler{Store: orderStore}
+	publisher := events.NewKafkaPublisher(cfg.KafkaBrokers)
+	defer func() {
+		if err := publisher.Close(); err != nil {
+			slog.Error("failed to close kafka publisher", "error", err)
+		}
+	}()
+	orderHandler := handler.OrderHandler{Store: orderStore, Events: publisher}
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /health", handler.HealthHandler{ServiceName: cfg.ServiceName})

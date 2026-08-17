@@ -84,8 +84,11 @@ services:
       PORT: ${ORDER_API_PORT:-3002}
       SERVICE_NAME: ${ORDER_API_SERVICE_NAME:-order-api}
       DATABASE_URL: ${DATABASE_URL:-postgres://streamshop:streamshop@postgres:5432/streamshop?sslmode=disable}
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-redpanda:9092}
     depends_on:
       postgres:
+        condition: service_healthy
+      redpanda:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${PORT}/health || exit 1"]
@@ -189,6 +192,72 @@ services:
     entrypoint: ["/bin/sh", "/init.sh"]
     restart: on-failure
 
+  redpanda:
+    image: redpandadata/redpanda:v26.2.1
+    container_name: streamshop-redpanda
+    command:
+      - redpanda
+      - start
+      - --kafka-addr
+      - internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - internal://redpanda:9092,external://localhost:19092
+      - --pandaproxy-addr
+      - internal://0.0.0.0:8082,external://0.0.0.0:18082
+      - --advertise-pandaproxy-addr
+      - internal://redpanda:8082,external://localhost:18082
+      - --schema-registry-addr
+      - internal://0.0.0.0:8081,external://0.0.0.0:18081
+      - --rpc-addr
+      - redpanda:33145
+      - --advertise-rpc-addr
+      - redpanda:33145
+      - --mode
+      - dev-container
+      - --smp
+      - "1"
+      - --default-log-level=info
+    ports:
+      - "${REDPANDA_KAFKA_PORT:-19092}:19092"
+      - "${REDPANDA_ADMIN_PORT:-9644}:9644"
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "rpk cluster health | grep -E 'Healthy:.+true' || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  redpanda-console:
+    image: redpandadata/console:v3.10.0
+    container_name: streamshop-redpanda-console
+    entrypoint: /bin/sh
+    command: -c 'echo "$$CONSOLE_CONFIG_FILE" > /tmp/config.yml; /app/console'
+    ports:
+      - "${REDPANDA_CONSOLE_PORT:-8082}:8080"
+    environment:
+      CONFIG_FILEPATH: /tmp/config.yml
+      CONSOLE_CONFIG_FILE: |
+        kafka:
+          brokers: ["redpanda:9092"]
+        schemaRegistry:
+          enabled: true
+          urls: ["http://redpanda:8081"]
+        redpanda:
+          adminApi:
+            enabled: true
+            urls: ["http://redpanda:9644"]
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    restart: unless-stopped
+
   catalog-api-1:
     <<: *catalog-api
     container_name: streamshop-catalog-api-1
@@ -252,3 +321,4 @@ volumes:
   mongo_data:
   redisinsight_data:
   minio_data:
+  redpanda_data:

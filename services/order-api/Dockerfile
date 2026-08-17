@@ -19,7 +19,7 @@ COPY --from=builder /order-api .
 
 ENV PORT=3002
 ENV SERVICE_NAME=order-api
-# DATABASE_URL is provided by Compose at runtime
+# DATABASE_URL and KAFKA_BROKERS are provided by Compose at runtime
 EXPOSE 3002
 
 USER nobody

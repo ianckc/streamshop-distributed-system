@@ -15,7 +15,7 @@ Go HTTP service for creating orders and persisting them to PostgreSQL.
 | `POST /api/orders` | Implemented |
 | Traefik route (`/api/orders` on `:8080`) | Implemented |
 | Postgres persistence (`orders`, `order_items`) | Implemented |
-| Redpanda event publishing | Planned |
+| Redpanda event publishing | Implemented (`order.created` → `orders.events`; fail-open) |
 | Redis idempotency keys | Planned |
 | OpenTelemetry / metrics | Planned |
 
@@ -26,6 +26,7 @@ Go HTTP service for creating orders and persisting them to PostgreSQL.
 | Language | Go 1.26 |
 | HTTP | stdlib `net/http` |
 | Database | PostgreSQL 18 via `pgx` |
+| Events | Redpanda via kafka-go |
 | Port | `3002` (default) |
 
 ## Run with Docker Compose
@@ -37,7 +38,7 @@ cp .env.example .env   # optional
 docker compose up --build
 ```
 
-Starts **Traefik**, **nginx**, **postgres**, **mongo**, **redis**, **redisinsight**, **minio**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Place orders at `http://localhost:8080/api/orders`. Health/ready: `http://localhost:3002/health` and `http://localhost:3002/ready`.
+Starts **Traefik**, **nginx**, **postgres**, **mongo**, **redis**, **redisinsight**, **minio**, **redpanda**, **redpanda-console**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Place orders at `http://localhost:8080/api/orders`. Health/ready: `http://localhost:3002/health` and `http://localhost:3002/ready`.
 
 ## Endpoints
 
@@ -105,7 +106,13 @@ Create an order. Amounts are in **pence** (GBP minor units).
 }
 ```
 
-`total_pence` is computed server-side (`qty × price_pence` per item).
+`total_pence` is computed server-side (`qty × price_pence` per item). After the Postgres commit, `order.created` is published to Redpanda topic `orders.events` (auto-created on first produce). If Redpanda is down, the order is still saved and `201` is returned (fail-open; error logged). `/ready` still pings Postgres only.
+
+Inspect the event in Redpanda Console: [http://localhost:8082](http://localhost:8082) (topic `orders.events`).
+
+```bash
+docker compose exec redpanda rpk topic consume orders.events --num 1
+```
 
 **Errors:**
 
@@ -138,8 +145,9 @@ docker compose exec postgres \
 | `PORT` | `3002` | HTTP listen port |
 | `SERVICE_NAME` | `order-api` | Shown in health and ready responses |
 | `DATABASE_URL` | *(required)* | Postgres connection string |
+| `KAFKA_BROKERS` | *(required)* | Kafka bootstrap (Compose: `redpanda:9092`; host: `localhost:19092`) |
 
-Compose also reads root `.env` for `ORDER_API_PORT`, `ORDER_API_SERVICE_NAME`, and `DATABASE_URL`.
+Compose also reads root `.env` for `ORDER_API_PORT`, `ORDER_API_SERVICE_NAME`, `DATABASE_URL`, and `KAFKA_BROKERS`.
 
 Example `DATABASE_URL` for local Postgres:
 
@@ -152,10 +160,12 @@ Inside Compose, the hostname is `postgres` instead of `localhost`.
 ## Local development (without running the app in Docker)
 
 ```bash
-docker compose up -d postgres
+docker compose up -d postgres redpanda
 cp .env.example .env
 go run ./cmd/server
 ```
+
+`DATABASE_URL` in `.env.example` points at `localhost:5432`. `KAFKA_BROKERS` points at `localhost:19092`. Inside Compose the hostnames are `postgres` and `redpanda`.
 
 ## Tests
 
@@ -165,13 +175,13 @@ go test -coverprofile=coverage.out -coverpkg=./... ./...
 go tool cover -html=coverage.out -o coverage.html
 ```
 
-Handler tests use a fake store — no database required. Postgres store tests are not yet added.
+Handler tests use a fake store and publisher — no database or Redpanda required. Postgres store tests are not yet added.
 
 ## Project layout
 
 ```
 cmd/server/                 HTTP server entrypoint
-internal/config/            Environment configuration
+internal/events/            order.created payload and Kafka publisher
 internal/handler/           HTTP handlers
 internal/model/             Domain types
 internal/store/             Store interface
