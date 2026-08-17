@@ -136,7 +136,7 @@ Redis Insight (local GUI, not behind Traefik): [http://localhost:5540](http://lo
 
 ### Inspect MinIO
 
-MinIO console (not behind Traefik): [http://localhost:9001](http://localhost:9001) (`streamshop` / `streamshop`). S3 API: `http://localhost:9000`. Catalog-api does not upload yet; no buckets are created in this slice.
+MinIO console (not behind Traefik): [http://localhost:9001](http://localhost:9001) (`streamshop` / `streamshop`). S3 API: `http://localhost:9000`. `infra/minio/init.sh` creates empty `product-images` and `exports` buckets. Catalog-api does not upload yet.
 
 ```bash
 curl -sI http://localhost:9000/minio/health/live
