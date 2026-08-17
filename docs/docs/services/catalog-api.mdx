@@ -146,9 +146,10 @@ npm start
 
 ```bash
 npm test
+npm run test:coverage
 ```
 
-Handler tests use an in-memory fake store — no Mongo required.
+Handler tests use an in-memory fake store — no Mongo required. Coverage is printed in the terminal; HTML is written to `coverage/index.html`. Excluded: `src/server.ts` (process entrypoint) and type-only modules. `src/store/mongo.ts` stays in the report at 0% until Mongo is tested (mock or Testcontainers).
 
 ## Project layout
 
