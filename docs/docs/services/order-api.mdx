@@ -1,0 +1,173 @@
+---
+sidebar_position: 1
+---
+
+# order-api
+
+Go HTTP service for creating orders and persisting them to PostgreSQL.
+
+## Status
+
+| Feature | Status |
+|---------|--------|
+| `GET /health` | Implemented |
+| `POST /api/orders` | Implemented |
+| Postgres persistence (`orders`, `order_items`) | Implemented |
+| Redpanda event publishing | Planned |
+| Redis idempotency keys | Planned |
+| `GET /ready` | Planned |
+| OpenTelemetry / metrics | Planned |
+
+## Stack
+
+| | |
+|--|--|
+| Language | Go 1.26 |
+| HTTP | stdlib `net/http` |
+| Database | PostgreSQL 18 via `pgx` |
+| Port | `3002` (default) |
+
+## Run with Docker Compose
+
+From the repository root:
+
+```bash
+cp .env.example .env   # optional
+docker compose up --build
+```
+
+Starts **postgres** and **order-api**. The API is at `http://localhost:3002` (no Traefik yet).
+
+## Endpoints
+
+### `GET /health`
+
+Liveness check.
+
+```bash
+curl http://localhost:3002/health
+```
+
+```json
+{"status":"ok","service":"order-api"}
+```
+
+### `POST /api/orders`
+
+Create an order. Amounts are in **pence** (GBP minor units).
+
+**Request:**
+
+```json
+{
+  "user_id": "660e8400-e29b-41d4-a716-446655440001",
+  "items": [
+    {"product_id": "prod-001", "qty": 2, "price_pence": 1999}
+  ]
+}
+```
+
+| Field | Rules |
+|-------|--------|
+| `user_id` | Required, valid UUID |
+| `items` | Required, non-empty array |
+| `items[].product_id` | Required |
+| `items[].qty` | Required, &gt; 0 |
+| `items[].price_pence` | Required, &gt;= 0 |
+
+**Response `201`:**
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "user_id": "660e8400-e29b-41d4-a716-446655440001",
+  "status": "pending",
+  "total_pence": 3998,
+  "items": [
+    {"product_id": "prod-001", "qty": 2, "price_pence": 1999}
+  ],
+  "created_at": "2026-08-17T08:00:00.123456789Z"
+}
+```
+
+`total_pence` is computed server-side (`qty × price_pence` per item).
+
+**Errors:**
+
+| Status | When |
+|--------|------|
+| `400` | Invalid JSON or validation failure |
+| `503` | Database error |
+
+```bash
+curl -s -X POST http://localhost:3002/api/orders \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "user_id": "660e8400-e29b-41d4-a716-446655440001",
+    "items": [{"product_id": "prod-001", "qty": 2, "price_pence": 1999}]
+  }'
+```
+
+### Inspect Postgres
+
+```bash
+docker compose exec postgres \
+  psql -U streamshop -d streamshop \
+  -c 'SELECT id, user_id, status, total_pence FROM orders;'
+```
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3002` | HTTP listen port |
+| `SERVICE_NAME` | `order-api` | Shown in health response |
+| `DATABASE_URL` | *(required)* | Postgres connection string |
+
+Compose also reads root `.env` for `ORDER_API_PORT`, `ORDER_API_SERVICE_NAME`, and `DATABASE_URL`.
+
+Example `DATABASE_URL` for local Postgres:
+
+```bash
+postgres://streamshop:streamshop@localhost:5432/streamshop?sslmode=disable
+```
+
+Inside Compose, the hostname is `postgres` instead of `localhost`.
+
+## Local development (without running the app in Docker)
+
+```bash
+docker compose up -d postgres
+cp .env.example .env
+go run ./cmd/server
+```
+
+## Tests
+
+```bash
+go test ./...
+go test -coverprofile=coverage.out -coverpkg=./... ./...
+go tool cover -html=coverage.out -o coverage.html
+```
+
+Handler tests use a fake store — no database required. Postgres store tests are not yet added.
+
+## Project layout
+
+```
+cmd/server/                 HTTP server entrypoint
+internal/config/            Environment configuration
+internal/handler/           HTTP handlers
+internal/model/             Domain types
+internal/store/             Store interface
+internal/store/postgres/    Postgres implementation
+```
+
+## Database schema
+
+Defined in `infra/postgres/init.sql`:
+
+- **`orders`** — `id`, `user_id`, `status`, `total_pence`, `created_at`
+- **`order_items`** — `order_id`, `product_id`, `qty`, `price_pence`
+
+Orders are inserted in a single transaction (order row + all line items).

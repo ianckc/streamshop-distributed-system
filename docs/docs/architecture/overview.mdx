@@ -4,9 +4,23 @@ sidebar_position: 1
 
 # Architecture Overview
 
-StreamShop is an event-driven commerce and analytics platform. Requests enter through an API gateway, fan out to polyglot microservices, and async events flow through a Kafka-compatible queue into an OLAP store.
+StreamShop is an event-driven commerce and analytics platform. The **target** architecture routes requests through an API gateway to polyglot microservices; async events flow through a Kafka-compatible queue into an OLAP store.
 
-## High-level diagram
+## What's running today
+
+```mermaid
+flowchart LR
+  Client[Client] --> OrderAPI[order-api]
+  OrderAPI --> Postgres[(PostgreSQL_18)]
+```
+
+- **order-api** on `:3002` — `GET /health`, `POST /api/orders`
+- **PostgreSQL** — `orders` and `order_items` tables
+- No gateway, queue, or other services yet
+
+Details: [order-api](../services/order-api), [Quick Start](../getting-started/quick-start).
+
+## Target architecture
 
 ```mermaid
 flowchart TB
@@ -67,19 +81,16 @@ flowchart TB
   Prometheus --> Grafana
 ```
 
-## Orchestration
+## Orchestration (target)
 
-Everything runs locally via **Docker Compose** with optional profiles:
+Docker Compose with optional profiles:
 
-- **`minimal`** — gateway, core services, Postgres, Redis
-- **`full`** — all databases, Redpanda, MinIO, observability stack
+- **`minimal`** — gateway, core services, Postgres, Redis *(not yet defined)*
+- **`full`** — all databases, Redpanda, MinIO, observability *(not yet defined)*
 
-Two Docker networks isolate concerns:
+Today: `docker compose up` runs postgres + order-api only.
 
-- `streamshop` — service-to-service traffic
-- `data` — internal network for databases (not exposed on host in demo mode)
-
-## Service responsibilities
+## Service responsibilities (target)
 
 | Service | Owns writes to | Reads from |
 |---------|----------------|------------|
@@ -88,28 +99,28 @@ Two Docker networks isolate concerns:
 | `event-processor` | ClickHouse, PostgreSQL (status) | Redpanda |
 | `analytics-api` | — (read-only) | ClickHouse, PostgreSQL |
 
-Each service exposes `/health` and `/ready` endpoints and emits OpenTelemetry traces.
+**order-api today:** writes to PostgreSQL only; exposes `GET /health` (no `/ready`, tracing, or metrics yet).
 
 ## Component index
 
-| Component | Technology | Doc |
-|-----------|------------|-----|
-| API Gateway | Traefik v3 | [API Gateway](./api-gateway) |
-| Load Balancer | nginx | [Load Balancing](./load-balancing) |
-| Cache | Redis 7 | [Caching](./caching) |
-| Message Queue | Redpanda | [Messaging](./messaging) |
-| SQL (OLTP) | PostgreSQL 16 | [Storage](./storage) |
-| NoSQL | MongoDB 7 | [Storage](./storage) |
-| OLAP | ClickHouse 24 | [Storage](./storage) |
-| Object storage | MinIO | [Storage](./storage) |
-| Observability | OTel, Jaeger, Prometheus, Grafana | [Observability](./observability) |
+| Component | Technology | Doc | Status |
+|-----------|------------|-----|--------|
+| API Gateway | Traefik v3 | [API Gateway](./api-gateway) | Planned |
+| Load Balancer | nginx | [Load Balancing](./load-balancing) | Planned |
+| Cache | Redis 7 | [Caching](./caching) | Planned |
+| Message Queue | Redpanda | [Messaging](./messaging) | Planned |
+| SQL (OLTP) | PostgreSQL 18 | [Storage](./storage) | **Built** |
+| NoSQL | MongoDB 7 | [Storage](./storage) | Planned |
+| OLAP | ClickHouse 24 | [Storage](./storage) | Planned |
+| Object storage | MinIO | [Storage](./storage) | Planned |
+| Observability | OTel, Jaeger, Prometheus, Grafana | [Observability](./observability) | Planned |
 
-## User journeys
+## User journeys (target)
 
-1. **Browse catalog** — cached product list served by Node.js behind nginx (2 replicas)
-2. **Upload product image** — multipart upload to MinIO via catalog-api
-3. **Place order** — Go service writes to Postgres, publishes `order.created` to Redpanda
-4. **Async processing** — Rust consumer enriches event, writes ClickHouse, updates order status
-5. **Analytics** — Python service queries ClickHouse aggregates and Postgres detail
+1. **Browse catalog** — cached product list behind nginx (2 replicas)
+2. **Upload product image** — MinIO via catalog-api
+3. **Place order** — Go service writes to Postgres, publishes `order.created` *(write only today)*
+4. **Async processing** — Rust consumer → ClickHouse
+5. **Analytics** — Python queries ClickHouse + Postgres
 
-See [Order Placement](../data-flows/order-placement) for a sequence diagram.
+See [Order Placement](../data-flows/order-placement) for the full flow and what's implemented.

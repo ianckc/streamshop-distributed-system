@@ -10,6 +10,11 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'Services',
+      items: ['services/order-api'],
+    },
+    {
+      type: 'category',
       label: 'Architecture',
       items: [
         'architecture/overview',

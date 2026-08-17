@@ -6,16 +6,16 @@ sidebar_position: 6
 
 StreamShop is polyglot by design — each language handles a role that fits its strengths, not four identical CRUD apps.
 
-## Service map
+## Service map (target)
 
-| Service | Language | Framework | Port | Replicas |
-|---------|----------|-----------|------|----------|
-| `catalog-api` | Node.js 22 | Fastify | 3001 | 2 |
-| `order-api` | Go 1.22+ | Echo | 3002 | 1 |
-| `analytics-api` | Python 3.12 | FastAPI | 3003 | 1 |
-| `event-processor` | Rust | Axum + rdkafka | 3004 | 1 |
+| Service | Language | Framework | Port | Replicas | Status |
+|---------|----------|-----------|------|----------|--------|
+| `catalog-api` | Node.js 22 | Fastify | 3001 | 2 | Planned |
+| `order-api` | Go 1.26 | stdlib `net/http` | 3002 | 1 | **Built** |
+| `analytics-api` | Python 3.12 | FastAPI | 3003 | 1 | Planned |
+| `event-processor` | Rust | Axum + rdkafka | 3004 | 1 | Planned |
 
-## catalog-api (Node.js)
+## catalog-api (Node.js) — planned
 
 **Responsibility:** Product CRUD, image upload URLs, Redis cache-aside.
 
@@ -25,20 +25,26 @@ StreamShop is polyglot by design — each language handles a role that fits its 
 
 ## order-api (Go)
 
-**Responsibility:** Order creation, Postgres transactions, Redpanda event publishing.
+**Status:** **Implemented** (sync write path only).
 
-- Writes: PostgreSQL (orders, order_items)
-- Publishes: `order.created` events to Redpanda
-- Why Go: Strong concurrency model, excellent Postgres and Kafka client ecosystems
+**Responsibility:** Order creation and Postgres transactions.
 
-## analytics-api (Python)
+- Writes: PostgreSQL (`orders`, `order_items`)
+- Endpoints: `GET /health`, `POST /api/orders`
+- Planned: Redpanda `order.created` events, Redis idempotency
+
+Full reference: [order-api service doc](../services/order-api).
+
+- Why Go: Strong concurrency model, excellent Postgres client ecosystem
+
+## analytics-api (Python) — planned
 
 **Responsibility:** OLAP queries, reporting endpoints, Postgres detail reads.
 
 - Reads: ClickHouse (aggregates), PostgreSQL (order detail)
 - Why Python: FastAPI + clickhouse-driver for rapid analytics API development
 
-## event-processor (Rust)
+## event-processor (Rust) — planned
 
 **Responsibility:** Consume `orders.events`, validate schema, enrich, write ClickHouse + update Postgres status.
 
@@ -47,16 +53,17 @@ StreamShop is polyglot by design — each language handles a role that fits its 
 
 ## Cross-cutting concerns
 
-Every service implements:
+**Target** for every service:
 
-| Concern | Standard |
-|---------|----------|
-| Health | `GET /health` (liveness), `GET /ready` (readiness) |
-| Tracing | OpenTelemetry → Jaeger via OTLP |
-| Metrics | Prometheus `/metrics` scrape endpoint |
-| Logging | Structured JSON with `trace_id` field |
-| Config | Environment variables via Compose (no secrets in repo) |
-| API spec | OpenAPI 3.1 in `services/{name}/openapi.yaml` |
+| Concern | Standard | order-api today |
+|---------|----------|-----------------|
+| Health | `GET /health` | Yes |
+| Readiness | `GET /ready` | No |
+| Tracing | OpenTelemetry → Jaeger | No |
+| Metrics | Prometheus `/metrics` | No |
+| Logging | Structured JSON | Yes (slog) |
+| Config | Env via Compose | Yes |
+| API spec | OpenAPI in `services/{name}/` | No |
 
 ## Service boundaries
 
@@ -65,7 +72,7 @@ flowchart LR
   Catalog[catalog-api] -->|owns| Mongo[(MongoDB)]
   Catalog -->|owns| MinIO[(MinIO)]
   Order[order-api] -->|owns| Postgres[(PostgreSQL)]
-  Order -->|publishes| Redpanda[Redpanda]
+  Order -.->|planned| Redpanda[Redpanda]
   Processor[event-processor] -->|owns writes| ClickHouse[(ClickHouse)]
   Analytics[analytics-api] -->|read-only| ClickHouse
   Analytics -->|read-only| Postgres
