@@ -22,7 +22,7 @@ sidebar_position: 1
 | Redis 8 | Cache-aside for catalog list/detail (TTL 60s) |
 | Redis Insight | Local GUI on `:5540` (not behind Traefik) |
 | MinIO | Presigned `image_url` on catalog list/detail |
-| Redpanda | Kafka API `:19092`; produce planned |
+| Redpanda | Kafka API `:19092`; Console `:8082`; produce planned |
 | Analytics, observability | Not yet |
 
 ## Run the stack
@@ -34,7 +34,7 @@ cp .env.example .env   # optional — defaults work out of the box
 docker compose up --build
 ```
 
-This starts **Traefik**, **nginx**, **postgres**, **mongo**, **redis**, **redisinsight**, **minio**, **redpanda**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Place orders and list products through the gateway on **:8080**; health and debug calls can still hit **:3001** / **:3011** / **:3002** directly. Redis Insight is on **:5540**. MinIO console is on **:9001**. Redpanda Kafka API is on **:19092**.
+This starts **Traefik**, **nginx**, **postgres**, **mongo**, **redis**, **redisinsight**, **minio**, **redpanda**, **redpanda-console**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Place orders and list products through the gateway on **:8080**; health and debug calls can still hit **:3001** / **:3011** / **:3002** directly. Redis Insight is on **:5540**. MinIO console is on **:9001**. Redpanda Console is on **:8082**. Redpanda Kafka API is on **:19092**.
 
 ### Health checks (direct)
 

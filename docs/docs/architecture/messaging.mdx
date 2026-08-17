@@ -10,6 +10,8 @@ StreamShop uses **Redpanda** as its message broker — a Kafka-compatible event 
 
 Redpanda **v26.2.1** runs in Compose (`streamshop-redpanda`). Kafka API from the host is `localhost:19092`; other Compose services use `redpanda:9092`. Admin API is `localhost:9644`. Data is stored on the `redpanda_data` volume. `--mode dev-container` and `--smp 1` keep it suitable for a laptop. Not behind Traefik. order-api does not publish yet.
 
+Redpanda Console is a local debug GUI on [http://localhost:8082](http://localhost:8082) (not behind Traefik). Use it to browse topics and messages.
+
 ```bash
 docker compose exec redpanda rpk cluster health
 docker compose exec redpanda rpk topic list

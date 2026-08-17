@@ -231,6 +231,30 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  redpanda-console:
+    image: redpandadata/console:v3.10.0
+    container_name: streamshop-redpanda-console
+    entrypoint: /bin/sh
+    command: -c 'echo "$$CONSOLE_CONFIG_FILE" > /tmp/config.yml; /app/console'
+    ports:
+      - "${REDPANDA_CONSOLE_PORT:-8082}:8080"
+    environment:
+      CONFIG_FILEPATH: /tmp/config.yml
+      CONSOLE_CONFIG_FILE: |
+        kafka:
+          brokers: ["redpanda:9092"]
+        schemaRegistry:
+          enabled: true
+          urls: ["http://redpanda:8081"]
+        redpanda:
+          adminApi:
+            enabled: true
+            urls: ["http://redpanda:9644"]
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    restart: unless-stopped
+
   catalog-api-1:
     <<: *catalog-api
     container_name: streamshop-catalog-api-1

@@ -8,7 +8,7 @@ Local-first distributed systems showcase — polyglot microservices, event strea
 docker compose up --build
 ```
 
-Traefik is the HTTP entrypoint on **:8080**. Services are also published directly for local debugging. Traefik dashboard: [http://localhost:8081](http://localhost:8081). Redis Insight: [http://localhost:5540](http://localhost:5540). MinIO console: [http://localhost:9001](http://localhost:9001). Redpanda Kafka API: `localhost:19092`.
+Traefik is the HTTP entrypoint on **:8080**. Services are also published directly for local debugging. Traefik dashboard: [http://localhost:8081](http://localhost:8081). Redis Insight: [http://localhost:5540](http://localhost:5540). MinIO console: [http://localhost:9001](http://localhost:9001). Redpanda Console: [http://localhost:8082](http://localhost:8082). Redpanda Kafka API: `localhost:19092`.
 
 ```bash
 curl http://localhost:3001/health                 # catalog-api-1 liveness

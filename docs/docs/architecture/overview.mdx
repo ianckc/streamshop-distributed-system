@@ -38,6 +38,7 @@ flowchart LR
 - **Redis Insight** on `:5540` — local GUI; not behind Traefik
 - **MinIO** — S3 API `:9000`, console `:9001`; buckets `product-images` and `exports`; catalog-api returns presigned `image_url` on product reads (upload via API is planned)
 - **Redpanda** v26.2.1 — Kafka API `:19092` (host), `redpanda:9092` (Compose); no producer yet
+- **Redpanda Console** on `:8082` — local GUI for topics and messages; not behind Traefik
 
 Details: [catalog-api](../services/catalog-api), [order-api](../services/order-api), [Quick Start](../getting-started/quick-start).
 
@@ -109,7 +110,7 @@ Docker Compose with optional profiles:
 - **`minimal`** — gateway, core services, Postgres, Redis *(not yet defined)*
 - **`full`** — all databases, Redpanda, MinIO, observability *(not yet defined)*
 
-Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisinsight, minio, redpanda, order-api, catalog-api-1, and catalog-api-2.
+Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisinsight, minio, redpanda, redpanda-console, order-api, catalog-api-1, and catalog-api-2.
 
 ## Service responsibilities (target)
 

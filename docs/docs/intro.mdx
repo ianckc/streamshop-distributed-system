@@ -21,7 +21,7 @@ Customers browse a product catalog, place orders, and trigger an event pipeline 
 | nginx | **Built** (2× catalog-api, round_robin) |
 | Redis | **Built** (cache-aside, 60s TTL) |
 | MinIO | **Built** (presigned `image_url` on catalog GET; upload planned) |
-| Redpanda | **Built** (broker in Compose; produce planned) |
+| Redpanda | **Built** (broker + Console on `:8082`; produce planned) |
 | event-processor | Planned |
 | analytics-api + ClickHouse | Planned |
 | Observability stack | Planned |
