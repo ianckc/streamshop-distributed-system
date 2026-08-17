@@ -1,0 +1,41 @@
+name: order-api
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/order-api/**"
+      - ".github/workflows/order-api.yml"
+  pull_request:
+    paths:
+      - "services/order-api/**"
+      - ".github/workflows/order-api.yml"
+  workflow_dispatch:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/order-api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/order-api/go.mod
+          cache-dependency-path: services/order-api/go.sum
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "The following files are not gofmt'd:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Test
+        run: go test ./...
