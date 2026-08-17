@@ -26,6 +26,7 @@ flowchart LR
 - **PostgreSQL** — `orders` and `order_items` tables
 - **MongoDB** — `products` collection
 - **Redis** — running in Compose; catalog-api does not cache yet
+- **Redis Insight** on `:5540` — local GUI; not behind Traefik
 - No queue or other services yet
 
 Details: [catalog-api](../services/catalog-api), [order-api](../services/order-api), [Quick Start](../getting-started/quick-start).
@@ -98,7 +99,7 @@ Docker Compose with optional profiles:
 - **`minimal`** — gateway, core services, Postgres, Redis *(not yet defined)*
 - **`full`** — all databases, Redpanda, MinIO, observability *(not yet defined)*
 
-Today: `docker compose up` runs Traefik, postgres, mongo, redis, order-api, and catalog-api.
+Today: `docker compose up` runs Traefik, postgres, mongo, redis, redisinsight, order-api, and catalog-api.
 
 ## Service responsibilities (target)
 

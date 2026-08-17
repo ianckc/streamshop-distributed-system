@@ -19,6 +19,7 @@ sidebar_position: 1
 | PostgreSQL 18 | Order persistence |
 | MongoDB 8 | Product catalog |
 | Redis 8 | In Compose; not used by catalog-api yet |
+| Redis Insight | Local GUI on `:5540` (not behind Traefik) |
 | Kafka, analytics, observability | Not yet |
 
 ## Run the stack
@@ -30,7 +31,7 @@ cp .env.example .env   # optional — defaults work out of the box
 docker compose up --build
 ```
 
-This starts **Traefik**, **postgres**, **mongo**, **redis**, **order-api**, and **catalog-api**. Place orders and list products through the gateway on **:8080**; health and debug calls can still hit **:3001** / **:3002** directly.
+This starts **Traefik**, **postgres**, **mongo**, **redis**, **redisinsight**, **order-api**, and **catalog-api**. Place orders and list products through the gateway on **:8080**; health and debug calls can still hit **:3001** / **:3002** directly. Redis Insight is on **:5540**.
 
 ### Health checks (direct)
 

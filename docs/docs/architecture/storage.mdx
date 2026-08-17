@@ -70,6 +70,8 @@ In-memory cache for hot catalog reads and (later) order idempotency keys. Redis 
 docker compose exec redis redis-cli ping
 ```
 
+Browse keys in Redis Insight at [http://localhost:5540](http://localhost:5540) (local debug GUI; not behind Traefik).
+
 ## ClickHouse (OLAP)
 
 Columnar analytics store for denormalized order event facts.

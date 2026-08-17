@@ -10,6 +10,8 @@ StreamShop uses **Redis 8** as an in-memory cache. Redis is never used as a prim
 
 Redis is in Docker Compose (`localhost:6379`, no password). **catalog-api does not read or write Redis yet** — product list/detail still hit Mongo on every request. Cache-aside is the next catalog slice.
 
+Redis Insight is a local debug GUI on [http://localhost:5540](http://localhost:5540) (not behind Traefik). It is preconnected to the Compose Redis service as `streamshop`.
+
 ```bash
 docker compose exec redis redis-cli ping
 ```

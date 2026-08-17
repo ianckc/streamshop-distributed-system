@@ -102,6 +102,35 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: streamshop-redisinsight
+    ports:
+      - "${REDIS_INSIGHT_PORT:-5540}:5540"
+    environment:
+      RI_REDIS_HOST: redis
+      RI_REDIS_PORT: "6379"
+      RI_REDIS_ALIAS: streamshop
+      RI_ACCEPT_TERMS_AND_CONDITIONS: "true"
+    volumes:
+      - redisinsight_data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:5540/api/health/', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
   catalog-api:
     build:
       context: ./services/catalog-api
@@ -138,3 +167,4 @@ services:
 volumes:
   postgres_data:
   mongo_data:
+  redisinsight_data:
