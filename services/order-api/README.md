@@ -1,35 +1,58 @@
 # order-api
 
-Go service for order creation, Postgres transactions, and event publishing.
+Go service for order creation and Postgres transactions.
 
-Currently exposes a health check only. Order endpoints will be added in later phases.
+Currently exposes:
 
-## Run locally
+- `GET /health`
+- `POST /api/orders`
 
-```bash
-go run ./cmd/server
-```
-
-The server listens on `:3002` by default.
+Event publishing to Redpanda comes in a later phase.
 
 ## Run with Docker Compose
 
 From the repository root:
 
 ```bash
-# Optional: override port / service name
-cp .env.example .env
-
-docker compose up --build order-api
+cp .env.example .env   # optional
+docker compose up --build
 ```
 
-Then:
+This starts **Postgres** and **order-api**.
+
+### Create an order
 
 ```bash
-curl http://localhost:${ORDER_API_PORT:-3002}/health
+curl -s -X POST http://localhost:3002/api/orders \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "user_id": "660e8400-e29b-41d4-a716-446655440001",
+    "items": [
+      {"product_id": "prod-001", "qty": 2, "price_pence": 1999}
+    ]
+  }'
 ```
 
-Compose reads root `.env` for host/container port mapping. Optional service overrides live in `services/order-api/.env` (copy from `.env.example`; not required to start).
+### Inspect Postgres
+
+```bash
+docker compose exec postgres \
+  psql -U streamshop -d streamshop \
+  -c 'SELECT id, user_id, status, total_pence FROM orders;'
+```
+
+## Run locally (without Compose for the app)
+
+```bash
+# Start only Postgres
+docker compose up -d postgres
+
+# Point at localhost Postgres
+cp .env.example .env
+# DATABASE_URL should use @localhost:5432
+
+go run ./cmd/server
+```
 
 ## Health check
 
@@ -37,30 +60,27 @@ Compose reads root `.env` for host/container port mapping. Optional service over
 curl http://localhost:3002/health
 ```
 
-Expected response:
-
-```json
-{"status":"ok","service":"order-api"}
-```
-
 ## Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `3002` | HTTP listen port (inside the process / container) |
+| `PORT` | `3002` | HTTP listen port |
 | `SERVICE_NAME` | `order-api` | Included in health response |
+| `DATABASE_URL` | *(required)* | Postgres connection string |
 
 | Compose variable (root `.env`) | Default | Description |
 |--------------------------------|---------|-------------|
 | `ORDER_API_PORT` | `3002` | Published and container port |
 | `ORDER_API_SERVICE_NAME` | `order-api` | Sets `SERVICE_NAME` in the container |
-
-For local `go run`, copy `services/order-api/.env.example` to `services/order-api/.env`.
+| `DATABASE_URL` | `postgres://...@postgres:5432/...` | Used inside Compose network |
 
 ## Project layout
 
 ```
-cmd/server/          HTTP server entrypoint
-internal/config/     Environment configuration
-internal/handler/    HTTP handlers
+cmd/server/                 HTTP server entrypoint
+internal/config/            Environment configuration
+internal/handler/           HTTP handlers
+internal/model/             Domain types
+internal/store/             Store interfaces
+internal/store/postgres/    Postgres implementation
 ```

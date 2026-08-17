@@ -12,6 +12,7 @@ import (
 
 	"github.com/ianckc/distributed-systems/services/order-api/internal/config"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/handler"
+	"github.com/ianckc/distributed-systems/services/order-api/internal/store/postgres"
 )
 
 func main() {
@@ -24,8 +25,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	pool, err := postgres.Connect(ctx, cfg.DatabaseURL)
+	cancel()
+	if err != nil {
+		slog.Error("failed to connect to database", "error", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+
+	orderHandler := handler.OrderHandler{Store: postgres.NewOrderStore(pool)}
+
 	mux := http.NewServeMux()
-	mux.Handle("/health", handler.HealthHandler{ServiceName: cfg.ServiceName})
+	mux.Handle("GET /health", handler.HealthHandler{ServiceName: cfg.ServiceName})
+	mux.HandleFunc("POST /api/orders", orderHandler.Create)
 
 	server := &http.Server{
 		Addr:         cfg.Addr(),
@@ -47,11 +60,11 @@ func main() {
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
 
 	slog.Info("shutting down")
-	if err := server.Shutdown(ctx); err != nil {
+	if err := server.Shutdown(shutdownCtx); err != nil {
 		slog.Error("shutdown failed", "error", err)
 		os.Exit(1)
 	}

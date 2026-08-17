@@ -1,4 +1,24 @@
 services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: streamshop-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-streamshop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-streamshop}
+      POSTGRES_DB: ${POSTGRES_DB:-streamshop}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
   order-api:
     build:
       context: ./services/order-api
@@ -12,6 +32,10 @@ services:
     environment:
       PORT: ${ORDER_API_PORT:-3002}
       SERVICE_NAME: ${ORDER_API_SERVICE_NAME:-order-api}
+      DATABASE_URL: ${DATABASE_URL:-postgres://streamshop:streamshop@postgres:5432/streamshop?sslmode=disable}
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${PORT}/health || exit 1"]
       interval: 10s
@@ -19,3 +43,6 @@ services:
       retries: 3
       start_period: 5s
     restart: unless-stopped
+
+volumes:
+  postgres_data:

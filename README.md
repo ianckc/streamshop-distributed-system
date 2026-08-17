@@ -40,14 +40,20 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Quick start
 
 ```bash
-# Optional: copy and edit Compose defaults
-cp .env.example .env
+cp .env.example .env   # optional
 
-docker compose up --build order-api
+docker compose up --build
 curl http://localhost:3002/health
+
+curl -s -X POST http://localhost:3002/api/orders \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "user_id": "660e8400-e29b-41d4-a716-446655440001",
+    "items": [{"product_id": "prod-001", "qty": 2, "price_pence": 1999}]
+  }'
 ```
 
-Full stack (`--profile full`) comes later as more services are added.
+More services and profiles come later as the stack grows.
 
 ## License
 

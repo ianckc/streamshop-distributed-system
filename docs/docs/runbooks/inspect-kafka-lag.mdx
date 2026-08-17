@@ -70,7 +70,7 @@ For interviews, this sequence demonstrates resilience:
 ```bash
 # 1. Create an order (note the order_id)
 curl -X POST http://localhost:8080/api/orders -H 'Content-Type: application/json' \
-  -d '{"user_id":"660e8400-e29b-41d4-a716-446655440001","items":[{"product_id":"prod-001","qty":1,"price_cents":999}]}'
+  -d '{"user_id":"660e8400-e29b-41d4-a716-446655440001","items":[{"product_id":"prod-001","qty":1,"price_pence":999}]}'
 
 # 2. Kill the processor
 docker compose stop event-processor

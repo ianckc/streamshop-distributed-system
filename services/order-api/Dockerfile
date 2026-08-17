@@ -3,7 +3,7 @@ FROM golang:1.26-alpine AS builder
 
 WORKDIR /src
 
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
@@ -19,6 +19,7 @@ COPY --from=builder /order-api .
 
 ENV PORT=3002
 ENV SERVICE_NAME=order-api
+# DATABASE_URL is provided by Compose at runtime
 EXPOSE 3002
 
 USER nobody

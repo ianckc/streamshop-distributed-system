@@ -6,8 +6,9 @@ import (
 )
 
 type Config struct {
-	Port        string
-	ServiceName string
+	Port         string
+	ServiceName  string
+	DatabaseURL  string
 }
 
 func Load() (Config, error) {
@@ -21,9 +22,15 @@ func Load() (Config, error) {
 		serviceName = "order-api"
 	}
 
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		return Config{}, fmt.Errorf("DATABASE_URL is required")
+	}
+
 	return Config{
 		Port:        port,
 		ServiceName: serviceName,
+		DatabaseURL: databaseURL,
 	}, nil
 }
 

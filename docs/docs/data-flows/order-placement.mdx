@@ -50,7 +50,7 @@ curl -X POST http://localhost:8080/api/orders \
   -d '{
     "user_id": "660e8400-e29b-41d4-a716-446655440001",
     "items": [
-      {"product_id": "prod-001", "qty": 2, "price_cents": 1999}
+      {"product_id": "prod-001", "qty": 2, "price_pence": 1999}
     ]
   }'
 ```
@@ -82,7 +82,7 @@ After processing (typically < 1 second locally):
 
 ```bash
 curl http://localhost:8080/api/analytics/orders/summary
-# {"total_orders": 42, "total_revenue_cents": 83958, "period": "last_24h"}
+# {"total_orders": 42, "total_revenue_pence": 83958, "period": "last_24h"}
 ```
 
 ## Failure scenarios

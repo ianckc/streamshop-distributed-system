@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Products in StreamShop have variable attributes — color, size, material, weight — that differ per category. A running shoe has sizes; a book has ISBN and author. Forcing these into rigid relational columns leads to sparse tables or excessive EAV patterns.
+Products in StreamShop have variable attributes — colour, size, material, weight — that differ per category. A running shoe has sizes; a book has ISBN and author. Forcing these into rigid relational columns leads to sparse tables or excessive EAV patterns.
 
 Options considered:
 
