@@ -6,9 +6,9 @@ import (
 )
 
 type Config struct {
-	Port         string
-	ServiceName  string
-	DatabaseURL  string
+	Port        string
+	ServiceName string
+	DatabaseURL string
 }
 
 func Load() (Config, error) {
