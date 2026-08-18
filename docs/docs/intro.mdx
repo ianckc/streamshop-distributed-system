@@ -17,7 +17,7 @@ Customers browse a product catalog, place orders, and trigger an event pipeline 
 | [catalog-api](./services/catalog-api) — health + product list/detail | **Built** |
 | PostgreSQL — orders schema | **Built** |
 | MongoDB — product catalog | **Built** |
-| Traefik — `/api/orders`, `/api/catalog` on `:8080` | **Built** |
+| Traefik — `/api/orders`, `/api/catalog`, `/api/analytics`, `/docs/` on `:8080` | **Built** |
 | nginx | **Built** (2× catalog-api, round_robin) |
 | Redis | **Built** (cache-aside, 60s TTL) |
 | MinIO | **Built** (presigned `image_url` on catalog GET; upload planned) |

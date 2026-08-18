@@ -1,0 +1,14 @@
+# docs-site image (build context is repo root)
+docs/node_modules
+docs/build
+docs/.docusaurus
+docs/.cache-loader
+.git
+services
+infra/postgres
+infra/mongo
+infra/clickhouse
+infra/grafana
+infra/prometheus
+infra/otel-collector
+infra/minio

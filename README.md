@@ -2,13 +2,13 @@
 
 Local-first distributed systems showcase — polyglot microservices, event streaming, and multi-store architecture.
 
-**Documentation:** run the docs site (`cd docs && npm start`) or see [PLAN.md](./PLAN.md) for the roadmap.
+**Documentation:** [http://localhost:8080/docs/](http://localhost:8080/docs/) via Traefik (included in `docker compose up`), or run the dev server with `cd docs && npm start` on [http://localhost:3100/docs/](http://localhost:3100/docs/). See [PLAN.md](./PLAN.md) for the roadmap.
 
 ```bash
 docker compose up --build
 ```
 
-Traefik is the HTTP entrypoint on **:8080**. Services are also published directly for local debugging. Traefik dashboard: [http://localhost:8081](http://localhost:8081). Redis Insight: [http://localhost:5540](http://localhost:5540). MinIO console: [http://localhost:9001](http://localhost:9001). Redpanda Console: [http://localhost:8082](http://localhost:8082). Redpanda Kafka API: `localhost:19092`. ClickHouse HTTP: `localhost:8123`.
+Traefik is the HTTP entrypoint on **:8080** (APIs and docs at `/docs/`). Services are also published directly for local debugging. Traefik dashboard: [http://localhost:8081](http://localhost:8081). Redis Insight: [http://localhost:5540](http://localhost:5540). MinIO console: [http://localhost:9001](http://localhost:9001). Redpanda Console: [http://localhost:8082](http://localhost:8082). Redpanda Kafka API: `localhost:19092`. ClickHouse HTTP: `localhost:8123`.
 
 ### Observability stack (optional)
 

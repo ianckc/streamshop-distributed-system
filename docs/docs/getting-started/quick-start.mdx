@@ -13,7 +13,7 @@ sidebar_position: 1
 
 | Component | Status |
 |-----------|--------|
-| Traefik v3 | `:8080` → `/api/orders`, `/api/catalog` (catalog via nginx); dashboard `:8081` |
+| Traefik v3 | `:8080` → `/api/orders`, `/api/catalog`, `/api/analytics`, `/docs/`; dashboard `:8081` |
 | nginx | Round-robin to 2× catalog-api |
 | `order-api` (Go) | `GET /health`, `GET /ready`, `POST /api/orders` → Postgres + `order.created` |
 | `catalog-api` (Node) | 2 replicas; health, ready, product list/detail, MinIO `image_url` |
@@ -26,6 +26,7 @@ sidebar_position: 1
 | `event-processor` (Rust) | Consume `order.created` → ClickHouse + Postgres `processed` |
 | ClickHouse 24 | `order_events` on HTTP `:8123` |
 | `analytics-api` (Python) | `GET /api/analytics/orders/summary`, order detail |
+| `docs-site` (Docusaurus) | Static docs at `/docs/` via Traefik |
 | Observability | `--profile observability`: OTel Collector, Jaeger `:16686`, Prometheus `:9090`, Grafana `:3000` |
 
 ## Run the stack
@@ -37,7 +38,7 @@ cp .env.example .env   # optional — defaults work out of the box
 docker compose up --build
 ```
 
-This starts **Traefik**, **nginx**, **postgres**, **mongo**, **redis**, **redisinsight**, **minio**, **redpanda**, **redpanda-console**, **clickhouse**, **event-processor**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Place orders and list products through the gateway on **:8080**; health and debug calls can still hit **:3001** / **:3011** / **:3002** / **:3004** directly. Redis Insight is on **:5540**. MinIO console is on **:9001**. Redpanda Console is on **:8082**. Redpanda Kafka API is on **:19092**. ClickHouse HTTP is on **:8123**.
+This starts **Traefik**, **nginx**, **docs-site**, **postgres**, **mongo**, **redis**, **redisinsight**, **minio**, **redpanda**, **redpanda-console**, **clickhouse**, **event-processor**, **analytics-api**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Place orders and list products through the gateway on **:8080**; browse docs at [http://localhost:8080/docs/](http://localhost:8080/docs/). Health and debug calls can still hit **:3001** / **:3011** / **:3002** / **:3004** directly. Redis Insight is on **:5540**. MinIO console is on **:9001**. Redpanda Console is on **:8082**. Redpanda Kafka API is on **:19092**. ClickHouse HTTP is on **:8123**.
 
 ### Health checks (direct)
 
@@ -90,13 +91,22 @@ To wipe data and re-run Postgres init SQL and Mongo seed: `docker compose down -
 
 ## Run the docs site
 
+With Compose (recommended — same URL as in production):
+
+```bash
+docker compose up --build
+# http://localhost:8080/docs/
+```
+
+For live reload while editing content:
+
 ```bash
 cd docs
 npm install
 npm start
 ```
 
-Opens at [http://localhost:3000](http://localhost:3000).
+Opens at [http://localhost:3100/docs/](http://localhost:3100/docs/) (not `:3000`, which is Grafana when the observability profile is up).
 
 ## Observability stack
 

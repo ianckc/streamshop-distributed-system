@@ -11,8 +11,8 @@ const config: Config = {
     v4: true,
   },
 
-  url: 'http://localhost:3000',
-  baseUrl: '/',
+  url: process.env.DOCUSAURUS_URL ?? 'http://localhost:3100',
+  baseUrl: '/docs/',
 
   organizationName: 'ianckc',
   projectName: 'distributed-systems',
@@ -33,6 +33,7 @@ const config: Config = {
       'classic',
       {
         docs: {
+          routeBasePath: '/',
           sidebarPath: './sidebars.ts',
           editUrl:
             'https://github.com/ianckc/distributed-systems/tree/main/docs/',
