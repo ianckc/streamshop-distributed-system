@@ -21,16 +21,17 @@ Customers browse a product catalog, place orders, and trigger an event pipeline 
 | nginx | **Built** (2× catalog-api, round_robin) |
 | Redis | **Built** (cache-aside, 60s TTL) |
 | MinIO | **Built** (presigned `image_url` on catalog GET; upload planned) |
-| Redpanda | **Built** (broker, Console `:8082`, `order.created` produce) |
-| event-processor | Planned |
-| analytics-api + ClickHouse | Planned |
+| [event-processor](./services/event-processor) — consume `order.created` | **Built** |
+| Redpanda | **Built** (broker, Console `:8082`, produce + consume) |
+| ClickHouse | **Built** (`order_events`) |
+| analytics-api | Planned |
 | Observability stack | Planned |
 
 See [Quick Start](./getting-started/quick-start) to run what exists today.
 
 ## What you'll find here
 
-- **Service docs** — [catalog-api](./services/catalog-api), [order-api](./services/order-api)
+- **Service docs** — [catalog-api](./services/catalog-api), [order-api](./services/order-api), [event-processor](./services/event-processor)
 - **Architecture** — target design for gateway, messaging, storage, observability
 - **Data flows** — end-to-end journeys (with built vs planned sections)
 - **ADRs** — design rationale
@@ -64,7 +65,7 @@ flowchart LR
 | Service | Language | Responsibility |
 |---------|----------|----------------|
 | `catalog-api` | Node.js + TypeScript | Product catalog, caching, image uploads |
-| `order-api` | Go | Order creation, Postgres transactions *(event publishing planned)* |
+| `order-api` | Go | Order creation, Postgres transactions, `order.created` |
 | `analytics-api` | Python | OLAP queries and reporting |
 | `event-processor` | Rust | Async event consumption and enrichment |
 

@@ -1,0 +1,40 @@
+name: event-processor
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/event-processor/**"
+      - ".github/workflows/event-processor.yml"
+  pull_request:
+    paths:
+      - "services/event-processor/**"
+      - ".github/workflows/event-processor.yml"
+  workflow_dispatch:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/event-processor
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install rdkafka build deps
+        run: sudo apt-get update && sudo apt-get install -y cmake libssl-dev libsasl2-dev zlib1g-dev libcurl4-openssl-dev
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Test
+        run: cargo test
+
+      - name: Test with Kafka client
+        run: cargo test --features kafka

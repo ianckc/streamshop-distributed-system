@@ -38,7 +38,7 @@ cp .env.example .env   # optional
 docker compose up --build
 ```
 
-Starts **Traefik**, **nginx**, **postgres**, **mongo**, **redis**, **redisinsight**, **minio**, **redpanda**, **redpanda-console**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Place orders at `http://localhost:8080/api/orders`. Health/ready: `http://localhost:3002/health` and `http://localhost:3002/ready`.
+Starts **Traefik**, **nginx**, **postgres**, **mongo**, **redis**, **redisinsight**, **minio**, **redpanda**, **redpanda-console**, **clickhouse**, **event-processor**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Place orders at `http://localhost:8080/api/orders`. Health/ready: `http://localhost:3002/health` and `http://localhost:3002/ready`.
 
 ## Endpoints
 
@@ -106,7 +106,7 @@ Create an order. Amounts are in **pence** (GBP minor units).
 }
 ```
 
-`total_pence` is computed server-side (`qty × price_pence` per item). After the Postgres commit, `order.created` is published to Redpanda topic `orders.events` (auto-created on first produce). If Redpanda is down, the order is still saved and `201` is returned (fail-open; error logged). `/ready` still pings Postgres only.
+`total_pence` is computed server-side (`qty × price_pence` per item). After the Postgres commit, `order.created` is published to Redpanda topic `orders.events` (auto-created on first produce). If Redpanda is down, the order is still saved and `201` is returned (fail-open; error logged). `/ready` still pings Postgres only. The `201` body shows `status: "pending"`; [event-processor](./event-processor) later sets it to `processed`.
 
 Inspect the event in Redpanda Console: [http://localhost:8082](http://localhost:8082) (topic `orders.events`).
 

@@ -258,6 +258,65 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: streamshop-clickhouse
+    ports:
+      - "${CLICKHOUSE_HTTP_PORT:-8123}:8123"
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-streamshop}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-streamshop}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-streamshop}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./infra/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./infra/clickhouse/memory.xml:/etc/clickhouse-server/config.d/memory.xml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user \"$$CLICKHOUSE_USER\" --password \"$$CLICKHOUSE_PASSWORD\" --query 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  event-processor:
+    build:
+      context: ./services/event-processor
+      dockerfile: Dockerfile
+    container_name: streamshop-event-processor
+    ports:
+      - "${EVENT_PROCESSOR_PORT:-3004}:3004"
+    env_file:
+      - path: ./services/event-processor/.env
+        required: false
+    environment:
+      PORT: "3004"
+      SERVICE_NAME: ${EVENT_PROCESSOR_SERVICE_NAME:-event-processor}
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-redpanda:9092}
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-orders.events}
+      KAFKA_DLQ_TOPIC: ${KAFKA_DLQ_TOPIC:-orders.events.dlq}
+      KAFKA_GROUP_ID: ${KAFKA_GROUP_ID:-event-processor}
+      DATABASE_URL: ${DATABASE_URL:-postgres://streamshop:streamshop@postgres:5432/streamshop?sslmode=disable}
+      CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-streamshop}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-streamshop}
+      CLICKHOUSE_DATABASE: ${CLICKHOUSE_DATABASE:-streamshop}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3004/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
   catalog-api-1:
     <<: *catalog-api
     container_name: streamshop-catalog-api-1
@@ -322,3 +381,4 @@ volumes:
   redisinsight_data:
   minio_data:
   redpanda_data:
+  clickhouse_data:

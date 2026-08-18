@@ -4,6 +4,9 @@
 !.env.example
 !**/.env.example
 
+# Rust
+**/target/
+
 # OS / editor
 .DS_Store
 *.swp

@@ -11,7 +11,7 @@ StreamShop uses **Traefik v3** as the edge API gateway — the HTTP entrypoint f
 - HTTP entrypoint: `localhost:8080`
 - Dashboard: `localhost:8081` (`--api.insecure` for local use)
 - Routed: `PathPrefix(/api/orders)` → order-api, `PathPrefix(/api/catalog)` → nginx (then 2× catalog-api)
-- Direct access: catalog replicas on `:3001` / `:3011`, order-api on `:3002`
+- Direct access: catalog replicas on `:3001` / `:3011`, order-api on `:3002`, event-processor on `:3004` (not behind Traefik)
 
 ```yaml
 labels:

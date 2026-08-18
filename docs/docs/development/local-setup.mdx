@@ -11,13 +11,13 @@ sidebar_position: 1
 | `order-api` | Go 1.26+ | **Built** |
 | `catalog-api` | Node.js 22 + TypeScript | **Built** (health + Mongo list/detail) |
 | `analytics-api` | Python 3.12 | Planned |
-| `event-processor` | Rust stable | Planned |
+| `event-processor` | Rust stable | **Built** (consume `order.created`) |
 
 ## order-api (implemented)
 
 ### With Docker Compose
 
-From the repo root — starts Traefik, nginx, Postgres, Mongo, Redis, Redis Insight, MinIO, Redpanda, Redpanda Console, order-api, and two catalog-api replicas:
+From the repo root — starts Traefik, nginx, Postgres, Mongo, Redis, Redis Insight, MinIO, Redpanda, Redpanda Console, ClickHouse, event-processor, order-api, and two catalog-api replicas:
 
 ```bash
 docker compose up --build
@@ -74,17 +74,32 @@ npm run lint
 
 See [catalog-api](../services/catalog-api) for endpoints and configuration.
 
+## event-processor (implemented)
+
+Included in `docker compose up --build`. Health/ready: `http://localhost:3004/health` and `http://localhost:3004/ready`.
+
+Unit tests do not need cmake, Kafka, or ClickHouse:
+
+```bash
+cd services/event-processor
+cargo test
+cargo fmt --check
+```
+
+See [event-processor](../services/event-processor).
+
 ## Environment variables (order-api)
 
 ```bash
 PORT=3002
 SERVICE_NAME=order-api
 DATABASE_URL=postgres://streamshop:streamshop@localhost:5432/streamshop?sslmode=disable
+KAFKA_BROKERS=localhost:19092
 ```
 
-Copy from `services/order-api/.env.example`. `DATABASE_URL` is **required**.
+Copy from `services/order-api/.env.example`. `DATABASE_URL` and `KAFKA_BROKERS` are **required**.
 
-Future variables (not used yet): `KAFKA_BROKERS`, `REDIS_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT`.
+Future variables (not used yet): `REDIS_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
 ## Environment variables (catalog-api)
 
@@ -105,11 +120,11 @@ Copy from `services/catalog-api/.env.example`. `MONGODB_URI`, `REDIS_URL`, and `
 
 ## Other services
 
-Redpanda is in Compose (Kafka API `localhost:19092`). ClickHouse is still planned.
+Redpanda is in Compose (Kafka API `localhost:19092`). ClickHouse HTTP is `localhost:8123`.
 
 ```bash
 # Start backing services only
-docker compose up -d postgres redis mongo minio redpanda
+docker compose up -d postgres redis mongo minio redpanda clickhouse
 
 # Run one service natively for fast iteration
 cd services/catalog-api && npm start
