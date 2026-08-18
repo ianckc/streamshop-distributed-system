@@ -134,11 +134,19 @@ cd services/analytics-api && pip install ".[dev]" && python -m analytics_api.mai
 
 ## Docs site
 
+With Compose (included in `docker compose up --build`):
+
+[http://localhost:8080/docs/](http://localhost:8080/docs/)
+
+For live reload while editing:
+
 ```bash
 cd docs
 npm install
 npm start
 ```
+
+Opens at [http://localhost:3100/docs/](http://localhost:3100/docs/). Grafana (observability profile) stays on `:3000`.
 
 ## Integration tests (planned)
 

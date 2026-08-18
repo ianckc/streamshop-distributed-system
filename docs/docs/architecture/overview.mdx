@@ -31,7 +31,7 @@ flowchart LR
   Processor --> Postgres
 ```
 
-- **Traefik** on `:8080` — `/api/orders` → order-api, `/api/catalog` → nginx → catalog replicas; dashboard on `:8081`
+- **Traefik** on `:8080` — `/api/orders` → order-api, `/api/catalog` → nginx → catalog replicas, `/api/analytics` → analytics-api, `/docs/` → docs-site; dashboard on `:8081`
 - **nginx** — round_robin across `catalog-api-1` and `catalog-api-2`
 - **catalog-api** — replica 1 on `:3001`, replica 2 on `:3011` (`GET /health`, `GET /ready`, product list/detail)
 - **order-api** on `:3002` — `GET /health`, `GET /ready`, `POST /api/orders` (Postgres write then `order.created`)
