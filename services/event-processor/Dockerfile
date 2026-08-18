@@ -2,7 +2,7 @@
 FROM rust:1-bookworm AS builder
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends cmake g++ libssl-dev libsasl2-dev zlib1g-dev \
+    && apt-get install -y --no-install-recommends cmake g++ libssl-dev libsasl2-dev zlib1g-dev libcurl4-openssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src

@@ -23,7 +23,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install rdkafka build deps
-        run: sudo apt-get update && sudo apt-get install -y cmake libssl-dev libsasl2-dev zlib1g-dev
+        run: sudo apt-get update && sudo apt-get install -y cmake libssl-dev libsasl2-dev zlib1g-dev libcurl4-openssl-dev
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
