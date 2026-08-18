@@ -16,7 +16,14 @@ Observability is a key differentiator for this portfolio project. StreamShop imp
 | Prometheus | Metrics scraping and storage |
 | Grafana | Dashboards |
 
-All observability services run under the `observability` Compose profile.
+All observability services run under the `observability` Compose profile. The containers are defined in `docker-compose.yml`; config lives under `infra/`.
+
+| Container | Image | Config |
+|-----------|-------|--------|
+| `otel-collector` | `otel/opentelemetry-collector-contrib:0.115.0` | `infra/otel-collector/config.yaml` |
+| `jaeger` | `jaegertracing/jaeger:2.6` | env: `COLLECTOR_OTLP_ENABLED=true` |
+| `prometheus` | `prom/prometheus:v3.4.1` | `infra/prometheus/prometheus.yaml` |
+| `grafana` | `grafana/grafana:11.6.0` | `infra/grafana/provisioning/` + `infra/grafana/dashboards/` |
 
 ## Distributed tracing
 
