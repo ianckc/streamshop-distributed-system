@@ -12,7 +12,7 @@ StreamShop is polyglot by design — each language handles a role that fits its 
 |---------|----------|-----------|------|----------|--------|
 | `catalog-api` | Node.js 22 + TypeScript | Fastify | 3001 / 3011 | 2 | **Built** (nginx + Redis cache) |
 | `order-api` | Go 1.26 | stdlib `net/http` | 3002 | 1 | **Built** |
-| `analytics-api` | Python 3.12 | FastAPI | 3003 | 1 | Planned |
+| `analytics-api` | Python 3.12 | FastAPI | 3003 | 1 | **Built** |
 | `event-processor` | Rust | Axum + rdkafka | 3004 | 1 | **Built** |
 
 ## catalog-api (Node.js + TypeScript)
@@ -42,12 +42,17 @@ Full reference: [order-api service doc](../services/order-api).
 
 - Why Go: Strong concurrency model, excellent Postgres client ecosystem
 
-## analytics-api (Python) — planned
+## analytics-api (Python)
+
+**Status:** **Implemented** (ClickHouse summary + Postgres order detail).
 
 **Responsibility:** OLAP queries, reporting endpoints, Postgres detail reads.
 
 - Reads: ClickHouse (aggregates), PostgreSQL (order detail)
-- Why Python: FastAPI + clickhouse-driver for rapid analytics API development
+- Endpoints: `GET /health`, `GET /ready`, `GET /api/analytics/orders/summary`, `GET /api/analytics/orders/{id}`
+- Why Python: FastAPI + clickhouse-connect for rapid analytics API development
+
+Full reference: [analytics-api service doc](../services/analytics-api).
 
 ## event-processor (Rust)
 
@@ -57,7 +62,6 @@ Full reference: [order-api service doc](../services/order-api).
 
 - Writes: ClickHouse (`order_events`); PostgreSQL (`orders.status`)
 - Endpoints: `GET /health`, `GET /ready`
-- Planned: analytics-api reads ClickHouse
 - Why Rust: Memory-safe, high-throughput consumer; ideal for always-on background processing
 
 Full reference: [event-processor service doc](../services/event-processor).
@@ -66,15 +70,15 @@ Full reference: [event-processor service doc](../services/event-processor).
 
 **Target** for every service:
 
-| Concern | Standard | order-api | catalog-api | event-processor |
-|---------|----------|-----------|-------------|-----------------|
-| Health | `GET /health` | Yes | Yes | Yes |
-| Readiness | `GET /ready` | Yes | Yes | Yes |
-| Tracing | OpenTelemetry → Jaeger | No | No | No |
-| Metrics | Prometheus `/metrics` | No | No | No |
-| Logging | Structured JSON | Yes (slog) | Yes (pino via Fastify) | Yes (tracing) |
-| Config | Env via Compose | Yes | Yes | Yes |
-| API spec | OpenAPI in `services/{name}/` | No | No | No |
+| Concern | Standard | order-api | catalog-api | event-processor | analytics-api |
+|---------|----------|-----------|-------------|-----------------|---------------|
+| Health | `GET /health` | Yes | Yes | Yes | Yes |
+| Readiness | `GET /ready` | Yes | Yes | Yes | Yes |
+| Tracing | OpenTelemetry → Jaeger | No | No | No | No |
+| Metrics | Prometheus `/metrics` | No | No | No | No |
+| Logging | Structured JSON | Yes (slog) | Yes (pino via Fastify) | Yes (tracing) | Yes (uvicorn) |
+| Config | Env via Compose | Yes | Yes | Yes | Yes |
+| API spec | OpenAPI in `services/{name}/` | No | No | No | No |
 
 ## Service boundaries
 

@@ -10,14 +10,14 @@ sidebar_position: 1
 |---------|---------|--------|
 | `order-api` | Go 1.26+ | **Built** |
 | `catalog-api` | Node.js 22 + TypeScript | **Built** (health + Mongo list/detail) |
-| `analytics-api` | Python 3.12 | Planned |
+| `analytics-api` | Python 3.12 | **Built** (ClickHouse summary + Postgres detail) |
 | `event-processor` | Rust stable | **Built** (consume `order.created`) |
 
 ## order-api (implemented)
 
 ### With Docker Compose
 
-From the repo root — starts Traefik, nginx, Postgres, Mongo, Redis, Redis Insight, MinIO, Redpanda, Redpanda Console, ClickHouse, event-processor, order-api, and two catalog-api replicas:
+From the repo root — starts Traefik, nginx, Postgres, Mongo, Redis, Redis Insight, MinIO, Redpanda, Redpanda Console, ClickHouse, event-processor, analytics-api, order-api, and two catalog-api replicas:
 
 ```bash
 docker compose up --build
@@ -129,6 +129,7 @@ docker compose up -d postgres redis mongo minio redpanda clickhouse
 # Run one service natively for fast iteration
 cd services/catalog-api && npm start
 cd services/order-api && go run ./cmd/server
+cd services/analytics-api && pip install ".[dev]" && python -m analytics_api.main
 ```
 
 ## Docs site

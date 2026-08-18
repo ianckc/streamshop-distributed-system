@@ -1,0 +1,146 @@
+---
+sidebar_position: 4
+---
+
+# analytics-api
+
+Python FastAPI service for read-only analytics: aggregate metrics from ClickHouse and order detail from PostgreSQL.
+
+## Status
+
+| Feature | Status |
+|---------|--------|
+| `GET /health` | Implemented |
+| `GET /ready` | Implemented (Postgres + ClickHouse ping) |
+| `GET /api/analytics/orders/summary` | Implemented |
+| `GET /api/analytics/orders/{id}` | Implemented |
+| Traefik routing `/api/analytics/*` | Implemented |
+| OpenTelemetry / metrics | Planned |
+
+## Stack
+
+| | |
+|--|--|
+| Language | Python 3.12 |
+| Framework | FastAPI + Uvicorn |
+| OLAP | ClickHouse 24 (`clickhouse-connect`) |
+| OLTP | PostgreSQL 18 via `psycopg` |
+| Port | `3003` (Traefik: `/api/analytics/*`) |
+
+## Run with Docker Compose
+
+From the repository root:
+
+```bash
+docker compose up --build
+```
+
+Health/ready: `http://localhost:3003/health` and `http://localhost:3003/ready`.
+
+Via Traefik:
+
+```bash
+curl http://localhost:8080/api/analytics/orders/summary
+```
+
+## Endpoints
+
+### `GET /health`
+
+Liveness check.
+
+```bash
+curl http://localhost:3003/health
+```
+
+```json
+{"status":"ok","service":"analytics-api"}
+```
+
+### `GET /ready`
+
+Pings PostgreSQL and ClickHouse.
+
+```bash
+curl http://localhost:3003/ready
+```
+
+Postgres or ClickHouse unavailable → `503` `{"detail":{"error":"not ready"}}`.
+
+### `GET /api/analytics/orders/summary`
+
+Aggregate metrics from ClickHouse `order_events` (uses `FINAL` on `ReplacingMergeTree`).
+
+```bash
+curl http://localhost:8080/api/analytics/orders/summary
+```
+
+```json
+{
+  "order_count": 1,
+  "total_revenue_pence": 3998,
+  "avg_order_value_pence": 3998.0,
+  "total_items": 2
+}
+```
+
+### `GET /api/analytics/orders/{id}`
+
+Order detail from Postgres (order row + line items). Useful for joining OLTP state with ClickHouse facts.
+
+```bash
+curl http://localhost:8080/api/analytics/orders/550e8400-e29b-41d4-a716-446655440000
+```
+
+Unknown order → `404` `{"detail":{"error":"order not found"}}`.
+
+## Demo
+
+Place an order, wait for event-processor, then query analytics:
+
+```bash
+ORDER=$(curl -s -X POST http://localhost:8080/api/orders \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":"660e8400-e29b-41d4-a716-446655440001","items":[{"product_id":"prod-001","qty":2,"price_pence":1999}]}')
+
+ORDER_ID=$(echo "$ORDER" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+curl -s http://localhost:8080/api/analytics/orders/summary | python3 -m json.tool
+curl -s "http://localhost:8080/api/analytics/orders/$ORDER_ID" | python3 -m json.tool
+```
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3003` | HTTP listen port |
+| `SERVICE_NAME` | `analytics-api` | Shown in health/ready JSON |
+| `DATABASE_URL` | *(required)* | Postgres URL |
+| `CLICKHOUSE_URL` | *(required)* | HTTP interface (`http://clickhouse:8123`) |
+| `CLICKHOUSE_USER` | `streamshop` | ClickHouse user |
+| `CLICKHOUSE_PASSWORD` | `streamshop` | ClickHouse password |
+| `CLICKHOUSE_DATABASE` | `streamshop` | Database with `order_events` |
+
+## Local development (without Docker)
+
+Requires Postgres and ClickHouse (e.g. `docker compose up postgres clickhouse` from repo root):
+
+```bash
+cd services/analytics-api
+cp .env.example .env
+pip install -e ".[dev]"
+pytest
+python -m analytics_api.main
+```
+
+## Project layout
+
+```
+src/analytics_api/
+  app.py              FastAPI routes
+  main.py             Uvicorn entrypoint
+  config.py           Environment configuration
+  store/postgres.py   Order detail reads
+  store/clickhouse.py Summary aggregates
+tests/test_routes.py  Route tests with mocked stores
+```

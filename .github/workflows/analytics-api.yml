@@ -1,0 +1,36 @@
+name: analytics-api
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/analytics-api/**"
+      - ".github/workflows/analytics-api.yml"
+  pull_request:
+    paths:
+      - "services/analytics-api/**"
+      - ".github/workflows/analytics-api.yml"
+  workflow_dispatch:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/analytics-api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/analytics-api/pyproject.toml
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Test
+        run: pytest

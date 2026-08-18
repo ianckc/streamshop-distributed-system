@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Order Placement
 
-End-to-end order flow from HTTP request to a ClickHouse analytics row. **The write, publish, and consume path are implemented today** — the Python analytics API is still planned.
+End-to-end order flow from HTTP request to a ClickHouse analytics row. **The write, publish, consume, and analytics read path are implemented today.**
 
 ## Implemented today
 
@@ -54,7 +54,7 @@ What happens:
 5. `201` response with order JSON (`status: "pending"`)
 6. event-processor inserts ClickHouse `order_events` and sets Postgres status to `processed`
 
-Not implemented yet: idempotency keys, analytics HTTP API.
+Not implemented yet: idempotency keys.
 
 Full API details: [order-api](../services/order-api).
 
@@ -98,7 +98,7 @@ sequenceDiagram
 - **Idempotency** — `Idempotency-Key` header + Redis *(not built)*
 - **Event publish** — `order.created` to Redpanda topic `orders.events` *(built; fail-open)*
 - **Async processing** — Rust consumer → ClickHouse + status update *(built)*
-- **Analytics** — `GET /api/analytics/orders/summary` via Traefik *(not built)*
+- **Analytics** — `GET /api/analytics/orders/summary` via Traefik *(built)*
 
 ### Planned failure behaviour
 

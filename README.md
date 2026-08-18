@@ -18,7 +18,10 @@ curl http://localhost:3002/health                 # order-api liveness
 curl http://localhost:3002/ready                  # order-api Postgres ping
 curl http://localhost:3004/health                 # event-processor liveness
 curl http://localhost:3004/ready                  # event-processor Postgres + ClickHouse
+curl http://localhost:3003/health                 # analytics-api liveness
+curl http://localhost:3003/ready                  # analytics-api Postgres + ClickHouse
 curl http://localhost:8080/api/catalog/products           # via Traefik → nginx (Mongo + Redis + MinIO image_url)
 curl http://localhost:8080/api/catalog/products/prod-001  # via Traefik → nginx
 curl http://localhost:8080/api/orders             # via Traefik (POST with a JSON body)
+curl http://localhost:8080/api/analytics/orders/summary   # via Traefik (ClickHouse aggregates)
 ```

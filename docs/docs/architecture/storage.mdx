@@ -88,9 +88,9 @@ CREATE TABLE order_events (
 ORDER BY (order_id);
 ```
 
-**Accessed by:** `event-processor` (writes), `analytics-api` (reads, planned)
+**Accessed by:** `event-processor` (writes), `analytics-api` (reads)
 
-**Today:** ClickHouse 24 runs in Compose. HTTP interface on `:8123` (native `:9000` is not published — MinIO uses that port). User/password `streamshop` / `streamshop`. Data is on the `clickhouse_data` volume. `infra/clickhouse/init.sql` creates `streamshop.order_events`. event-processor writes rows; analytics-api is not built.
+**Today:** ClickHouse 24 runs in Compose. HTTP interface on `:8123` (native `:9000` is not published — MinIO uses that port). User/password `streamshop` / `streamshop`. Data is on the `clickhouse_data` volume. `infra/clickhouse/init.sql` creates `streamshop.order_events`. event-processor writes rows; analytics-api reads aggregates via `GET /api/analytics/orders/summary`.
 
 ```bash
 curl -s http://localhost:8123/ping

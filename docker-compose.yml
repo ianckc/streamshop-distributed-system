@@ -280,6 +280,42 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  analytics-api:
+    build:
+      context: ./services/analytics-api
+      dockerfile: Dockerfile
+    container_name: streamshop-analytics-api
+    ports:
+      - "${ANALYTICS_API_PORT:-3003}:${ANALYTICS_API_PORT:-3003}"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.analytics-api.rule=PathPrefix(`/api/analytics`)
+      - traefik.http.routers.analytics-api.entrypoints=web
+      - traefik.http.services.analytics-api.loadbalancer.server.port=${ANALYTICS_API_PORT:-3003}
+    env_file:
+      - path: ./services/analytics-api/.env
+        required: false
+    environment:
+      PORT: ${ANALYTICS_API_PORT:-3003}
+      SERVICE_NAME: ${ANALYTICS_API_SERVICE_NAME:-analytics-api}
+      DATABASE_URL: ${DATABASE_URL:-postgres://streamshop:streamshop@postgres:5432/streamshop?sslmode=disable}
+      CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-streamshop}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-streamshop}
+      CLICKHOUSE_DATABASE: ${CLICKHOUSE_DATABASE:-streamshop}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${PORT}/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
   event-processor:
     build:
       context: ./services/event-processor
