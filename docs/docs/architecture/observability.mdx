@@ -16,7 +16,14 @@ Observability is a key differentiator for this portfolio project. StreamShop imp
 | Prometheus | Metrics scraping and storage |
 | Grafana | Dashboards |
 
-All observability services run under the `observability` Compose profile.
+All observability services run under the `observability` Compose profile. The containers are defined in `docker-compose.yml`; config lives under `infra/`.
+
+| Container | Image | Config |
+|-----------|-------|--------|
+| `otel-collector` | `otel/opentelemetry-collector-contrib:0.115.0` | `infra/otel-collector/config.yaml` |
+| `jaeger` | `jaegertracing/jaeger:2.6` | env: `COLLECTOR_OTLP_ENABLED=true` |
+| `prometheus` | `prom/prometheus:v3.4.1` | `infra/prometheus/prometheus.yaml` |
+| `grafana` | `grafana/grafana:11.6.0` | `infra/grafana/provisioning/` + `infra/grafana/dashboards/` |
 
 ## Distributed tracing
 
@@ -79,6 +86,17 @@ All services emit JSON logs to stdout:
 ```
 
 Docker Compose aggregates logs via `docker compose logs -f {service}`.
+
+## Per-service SDK integration
+
+All four services have OpenTelemetry SDKs wired in. They export via OTLP gRPC to the OTel Collector (`OTEL_EXPORTER_OTLP_ENDPOINT`). When the collector is not running (default `docker compose up` without the profile), the SDKs fail gracefully and the services run without telemetry.
+
+| Service | SDK | Instrumentation |
+|---------|-----|-----------------|
+| `order-api` (Go) | `go.opentelemetry.io/otel` | Custom HTTP middleware (traces + metrics) |
+| `catalog-api` (Node) | `@opentelemetry/sdk-node` | Auto-instrumentation (Fastify, MongoDB, Redis, HTTP) via `--import ./src/instrumentation.ts` |
+| `analytics-api` (Python) | `opentelemetry-sdk` | `FastAPIInstrumentor` + OTLP exporter |
+| `event-processor` (Rust) | `tracing-opentelemetry` | Bridges existing `tracing` spans to OTel |
 
 ## Compose profile
 

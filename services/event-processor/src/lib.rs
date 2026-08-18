@@ -6,3 +6,5 @@ pub mod event;
 pub mod http;
 pub mod orders;
 pub mod process;
+#[cfg(feature = "kafka")]
+pub mod telemetry;

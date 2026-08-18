@@ -85,10 +85,14 @@ services:
       SERVICE_NAME: ${ORDER_API_SERVICE_NAME:-order-api}
       DATABASE_URL: ${DATABASE_URL:-postgres://streamshop:streamshop@postgres:5432/streamshop?sslmode=disable}
       KAFKA_BROKERS: ${KAFKA_BROKERS:-redpanda:9092}
+      CATALOG_API_URL: ${CATALOG_API_URL:-http://nginx}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
     depends_on:
       postgres:
         condition: service_healthy
       redpanda:
+        condition: service_healthy
+      nginx:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${PORT}/health || exit 1"]
@@ -303,6 +307,7 @@ services:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-streamshop}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-streamshop}
       CLICKHOUSE_DATABASE: ${CLICKHOUSE_DATABASE:-streamshop}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
     depends_on:
       postgres:
         condition: service_healthy
@@ -338,6 +343,7 @@ services:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-streamshop}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-streamshop}
       CLICKHOUSE_DATABASE: ${CLICKHOUSE_DATABASE:-streamshop}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
     depends_on:
       postgres:
         condition: service_healthy
@@ -369,6 +375,7 @@ services:
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-streamshop}
       S3_BUCKET: ${S3_BUCKET:-product-images}
       S3_REGION: ${S3_REGION:-us-east-1}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
 
   catalog-api-2:
     <<: *catalog-api
@@ -386,6 +393,90 @@ services:
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-streamshop}
       S3_BUCKET: ${S3_BUCKET:-product-images}
       S3_REGION: ${S3_REGION:-us-east-1}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.158.0
+    container_name: streamshop-otel-collector
+    profiles: [observability]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    ports:
+      - "${OTEL_GRPC_PORT:-4317}:4317"
+      - "${OTEL_HTTP_PORT:-4318}:4318"
+      - "${OTEL_METRICS_PORT:-8889}:8889"
+    volumes:
+      - ./infra/otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+    depends_on:
+      jaeger:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/otelcol-contrib", "--version"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/jaeger:2.20.0
+    container_name: streamshop-jaeger
+    profiles: [observability]
+    ports:
+      - "${JAEGER_UI_PORT:-16686}:16686"
+      - "4317"
+    healthcheck:
+      test: ["CMD", "/cmd/jaeger/jaeger-linux", "version"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.4.1
+    container_name: streamshop-prometheus
+    profiles: [observability]
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9090/-/healthy || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    container_name: streamshop-grafana
+    profiles: [observability]
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
 
   nginx:
     image: nginx:1.27-alpine
@@ -418,3 +509,5 @@ volumes:
   minio_data:
   redpanda_data:
   clickhouse_data:
+  prometheus_data:
+  grafana_data:

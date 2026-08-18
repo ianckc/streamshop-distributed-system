@@ -6,17 +6,57 @@ use event_processor::config::Config;
 use event_processor::consume::{handle_message, KafkaIO};
 use event_processor::http::{router, AppState};
 use event_processor::orders::PostgresOrders;
+use event_processor::telemetry::init_propagation;
+use opentelemetry::trace::TracerProvider;
 use tokio::net::TcpListener;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
+
+fn init_tracing(service_name: &str) -> Option<opentelemetry_sdk::trace::SdkTracerProvider> {
+    let endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok()?;
+    if endpoint.is_empty() {
+        return None;
+    }
+
+    let exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_tonic()
+        .build()
+        .ok()?;
+
+    let provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
+        .with_batch_exporter(exporter)
+        .with_resource(
+            opentelemetry_sdk::Resource::builder()
+                .with_service_name(service_name.to_owned())
+                .build(),
+        )
+        .build();
+
+    let telemetry =
+        tracing_opentelemetry::layer().with_tracer(provider.tracer(service_name.to_owned()));
+
+    tracing_subscriber::registry()
+        .with(EnvFilter::from_default_env().add_directive("info".parse().unwrap()))
+        .with(tracing_subscriber::fmt::layer().json())
+        .with(telemetry)
+        .init();
+
+    Some(provider)
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .json()
-        .with_env_filter(EnvFilter::from_default_env().add_directive("info".parse()?))
-        .init();
-
     let cfg = Config::from_env()?;
+    init_propagation();
+    let _provider = init_tracing(&cfg.service_name);
+    if _provider.is_none() {
+        tracing_subscriber::fmt()
+            .json()
+            .with_env_filter(EnvFilter::from_default_env().add_directive("info".parse()?))
+            .init();
+    }
+
     let analytics = Arc::new(ClickHouseAnalytics::connect(
         &cfg.clickhouse_url,
         &cfg.clickhouse_user,

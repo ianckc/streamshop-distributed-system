@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use tracing::Instrument;
 use uuid::Uuid;
 
 use crate::event::OrderCreated;
@@ -52,8 +53,23 @@ pub async fn process_order_created(
     let event =
         crate::event::parse_order_created(payload).map_err(|err| ProcessError::Invalid(err.0))?;
     let row = OrderEventRow::from(&event);
-    analytics.insert_order_event(row.clone()).await?;
-    orders.mark_processed(event.order_id).await?;
+
+    analytics
+        .insert_order_event(row.clone())
+        .instrument(tracing::info_span!(
+            "clickhouse.insert_order_event",
+            order.id = %row.order_id,
+        ))
+        .await?;
+
+    orders
+        .mark_processed(event.order_id)
+        .instrument(tracing::info_span!(
+            "postgres.mark_processed",
+            order.id = %event.order_id,
+        ))
+        .await?;
+
     Ok(row)
 }
 

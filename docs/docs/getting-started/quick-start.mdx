@@ -26,7 +26,7 @@ sidebar_position: 1
 | `event-processor` (Rust) | Consume `order.created` → ClickHouse + Postgres `processed` |
 | ClickHouse 24 | `order_events` on HTTP `:8123` |
 | `analytics-api` (Python) | `GET /api/analytics/orders/summary`, order detail |
-| Observability stack | Not yet |
+| Observability | `--profile observability`: OTel Collector, Jaeger `:16686`, Prometheus `:9090`, Grafana `:3000` |
 
 ## Run the stack
 
@@ -98,15 +98,23 @@ npm start
 
 Opens at [http://localhost:3000](http://localhost:3000).
 
-## Coming later
-
-The full StreamShop vision adds analytics-api and observability. Compose profiles (`minimal`, `full`) will be added as those services land. See [PLAN.md](https://github.com/ianckc/distributed-systems/blob/main/PLAN.md).
-
-Planned example calls (via Traefik):
+## Observability stack
 
 ```bash
-curl http://localhost:8080/api/analytics/orders/summary
+docker compose --profile observability up --build
 ```
+
+This adds **otel-collector**, **jaeger**, **prometheus**, and **grafana** alongside all core services.
+
+| Tool | URL | Purpose |
+|------|-----|---------|
+| Jaeger | [http://localhost:16686](http://localhost:16686) | Distributed traces |
+| Prometheus | [http://localhost:9090](http://localhost:9090) | Metrics scraping |
+| Grafana | [http://localhost:3000](http://localhost:3000) | Dashboards (admin/admin) |
+
+Services export telemetry to the OTel Collector via OTLP (`:4317` gRPC, `:4318` HTTP). The collector forwards traces to Jaeger and exposes a Prometheus scrape endpoint. A pre-built "StreamShop Overview" dashboard is provisioned into Grafana.
+
+Per-service OTel SDK instrumentation is a separate step — the containers are ready to receive data once instrumentation is wired in.
 
 ## Next steps
 

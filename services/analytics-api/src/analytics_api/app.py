@@ -8,6 +8,13 @@ from analytics_api.config import Config
 from analytics_api.store.clickhouse import ClickHouseStore, OrderSummary
 from analytics_api.store.postgres import OrderDetail, PostgresStore
 
+try:
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+    _HAS_OTEL = True
+except ImportError:
+    _HAS_OTEL = False
+
 
 class HealthResponse(BaseModel):
     status: str
@@ -75,6 +82,9 @@ def create_app(
         app.state.config = cfg
         app.state.postgres = postgres
         app.state.clickhouse = clickhouse
+
+    if _HAS_OTEL:
+        FastAPIInstrumentor.instrument_app(app)
 
     @app.get("/health", response_model=HealthResponse)
     def health(request: Request) -> HealthResponse:
