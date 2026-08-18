@@ -24,14 +24,14 @@ Customers browse a product catalog, place orders, and trigger an event pipeline 
 | [event-processor](./services/event-processor) — consume `order.created` | **Built** |
 | Redpanda | **Built** (broker, Console `:8082`, produce + consume) |
 | ClickHouse | **Built** (`order_events`) |
-| analytics-api | Planned |
+| [analytics-api](./services/analytics-api) — order summary + detail | **Built** |
 | Observability stack | Planned |
 
 See [Quick Start](./getting-started/quick-start) to run what exists today.
 
 ## What you'll find here
 
-- **Service docs** — [catalog-api](./services/catalog-api), [order-api](./services/order-api), [event-processor](./services/event-processor)
+- **Service docs** — [catalog-api](./services/catalog-api), [order-api](./services/order-api), [event-processor](./services/event-processor), [analytics-api](./services/analytics-api)
 - **Architecture** — target design for gateway, messaging, storage, observability
 - **Data flows** — end-to-end journeys (with built vs planned sections)
 - **ADRs** — design rationale

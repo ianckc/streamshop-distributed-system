@@ -151,7 +151,7 @@ Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisins
 1. **Browse catalog** — cached product list behind nginx (2 replicas)
 2. **Upload product image** — MinIO via catalog-api
 3. **Place order** — Go service writes to Postgres, publishes `order.created`
-4. **Async processing** — Rust consumer → ClickHouse + `processed` *(analytics API not built)*
+4. **Async processing** — Rust consumer → ClickHouse + `processed`; analytics-api reads aggregates and order detail *(built)*
 5. **Analytics** — Python queries ClickHouse + Postgres
 
 See [Order Placement](../data-flows/order-placement) for the full flow and what's implemented.

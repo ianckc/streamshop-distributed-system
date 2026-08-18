@@ -11,7 +11,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Services',
-      items: ['services/order-api', 'services/catalog-api', 'services/event-processor'],
+      items: ['services/order-api', 'services/catalog-api', 'services/event-processor', 'services/analytics-api'],
     },
     {
       type: 'category',

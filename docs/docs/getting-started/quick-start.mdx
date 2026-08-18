@@ -25,7 +25,8 @@ sidebar_position: 1
 | Redpanda | Kafka API `:19092`; Console `:8082`; `orders.events` |
 | `event-processor` (Rust) | Consume `order.created` → ClickHouse + Postgres `processed` |
 | ClickHouse 24 | `order_events` on HTTP `:8123` |
-| Analytics API, observability | Not yet |
+| `analytics-api` (Python) | `GET /api/analytics/orders/summary`, order detail |
+| Observability stack | Not yet |
 
 ## Run the stack
 
