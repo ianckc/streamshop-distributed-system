@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use uuid::Uuid;
 use tracing::Instrument;
+use uuid::Uuid;
 
 use crate::event::OrderCreated;
 

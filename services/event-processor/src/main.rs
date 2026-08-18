@@ -33,7 +33,8 @@ fn init_tracing(service_name: &str) -> Option<opentelemetry_sdk::trace::SdkTrace
         )
         .build();
 
-    let telemetry = tracing_opentelemetry::layer().with_tracer(provider.tracer(service_name.to_owned()));
+    let telemetry =
+        tracing_opentelemetry::layer().with_tracer(provider.tracer(service_name.to_owned()));
 
     tracing_subscriber::registry()
         .with(EnvFilter::from_default_env().add_directive("info".parse().unwrap()))

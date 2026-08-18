@@ -32,8 +32,6 @@ impl Extractor for KafkaHeaderExtractor<'_> {
         let Some(headers) = self.headers else {
             return Vec::new();
         };
-        (0..headers.count())
-            .map(|i| headers.get(i).key)
-            .collect()
+        (0..headers.count()).map(|i| headers.get(i).key).collect()
     }
 }
