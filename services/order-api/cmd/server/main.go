@@ -14,6 +14,7 @@ import (
 	"github.com/ianckc/distributed-systems/services/order-api/internal/events"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/handler"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/store/postgres"
+	"github.com/ianckc/distributed-systems/services/order-api/internal/telemetry"
 )
 
 func main() {
@@ -24,6 +25,22 @@ func main() {
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
 		os.Exit(1)
+	}
+
+	otelCtx, otelCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	otelShutdown, err := telemetry.Init(otelCtx, cfg.ServiceName)
+	otelCancel()
+	if err != nil {
+		slog.Warn("otel init failed, continuing without telemetry", "error", err)
+	}
+	if otelShutdown != nil {
+		defer func() {
+			shutCtx, shutCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer shutCancel()
+			if err := otelShutdown(shutCtx); err != nil {
+				slog.Error("otel shutdown failed", "error", err)
+			}
+		}()
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -51,7 +68,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:         cfg.Addr(),
-		Handler:      mux,
+		Handler:      telemetry.HTTPMiddleware(mux),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,

@@ -87,6 +87,17 @@ All services emit JSON logs to stdout:
 
 Docker Compose aggregates logs via `docker compose logs -f {service}`.
 
+## Per-service SDK integration
+
+All four services have OpenTelemetry SDKs wired in. They export via OTLP gRPC to the OTel Collector (`OTEL_EXPORTER_OTLP_ENDPOINT`). When the collector is not running (default `docker compose up` without the profile), the SDKs fail gracefully and the services run without telemetry.
+
+| Service | SDK | Instrumentation |
+|---------|-----|-----------------|
+| `order-api` (Go) | `go.opentelemetry.io/otel` | Custom HTTP middleware (traces + metrics) |
+| `catalog-api` (Node) | `@opentelemetry/sdk-node` | Auto-instrumentation (Fastify, MongoDB, Redis, HTTP) via `--import ./src/instrumentation.ts` |
+| `analytics-api` (Python) | `opentelemetry-sdk` | `FastAPIInstrumentor` + OTLP exporter |
+| `event-processor` (Rust) | `tracing-opentelemetry` | Bridges existing `tracing` spans to OTel |
+
 ## Compose profile
 
 ```bash

@@ -74,8 +74,8 @@ Full reference: [event-processor service doc](../services/event-processor).
 |---------|----------|-----------|-------------|-----------------|---------------|
 | Health | `GET /health` | Yes | Yes | Yes | Yes |
 | Readiness | `GET /ready` | Yes | Yes | Yes | Yes |
-| Tracing | OpenTelemetry → Jaeger | No | No | No | No |
-| Metrics | Prometheus `/metrics` | No | No | No | No |
+| Tracing | OpenTelemetry → Jaeger | Yes | Yes | Yes | Yes |
+| Metrics | OTel → Prometheus | Yes | Yes | No | Yes |
 | Logging | Structured JSON | Yes (slog) | Yes (pino via Fastify) | Yes (tracing) | Yes (uvicorn) |
 | Config | Env via Compose | Yes | Yes | Yes | Yes |
 | API spec | OpenAPI in `services/{name}/` | No | No | No | No |
