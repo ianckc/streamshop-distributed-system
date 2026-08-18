@@ -5,9 +5,12 @@ use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::message::BorrowedMessage;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::Message;
+use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::config::Config;
 use crate::process::{process_order_created, AnalyticsStore, OrderStatusStore, ProcessError};
+use crate::telemetry::extract_context;
 
 pub struct KafkaIO {
     pub consumer: StreamConsumer,
@@ -44,28 +47,40 @@ pub async fn handle_message(
     analytics: &dyn AnalyticsStore,
     orders: &dyn OrderStatusStore,
 ) -> anyhow::Result<()> {
-    let payload = msg.payload().unwrap_or(&[]);
-    match process_order_created(payload, analytics, orders).await {
-        Ok(row) => {
-            tracing::info!(order_id = %row.order_id, "processed order.created");
-            kafka
-                .consumer
-                .commit_message(msg, rdkafka::consumer::CommitMode::Sync)?;
-            Ok(())
-        }
-        Err(ProcessError::Invalid(reason)) => {
-            tracing::warn!(error = %reason, "invalid order.created; sending to DLQ");
-            send_dlq(kafka, payload, &reason).await?;
-            kafka
-                .consumer
-                .commit_message(msg, rdkafka::consumer::CommitMode::Sync)?;
-            Ok(())
-        }
-        Err(ProcessError::Storage(err)) => {
-            tracing::error!(error = %err, "storage failure; will retry");
-            Err(err)
+    let parent_cx = extract_context(msg.headers());
+    let span = tracing::info_span!(
+        "kafka.process order.created",
+        messaging.system = "kafka",
+        messaging.destination.name = "orders.events",
+    );
+    span.set_parent(parent_cx);
+
+    async {
+        let payload = msg.payload().unwrap_or(&[]);
+        match process_order_created(payload, analytics, orders).await {
+            Ok(row) => {
+                tracing::info!(order_id = %row.order_id, "processed order.created");
+                kafka
+                    .consumer
+                    .commit_message(msg, rdkafka::consumer::CommitMode::Sync)?;
+                Ok(())
+            }
+            Err(ProcessError::Invalid(reason)) => {
+                tracing::warn!(error = %reason, "invalid order.created; sending to DLQ");
+                send_dlq(kafka, payload, &reason).await?;
+                kafka
+                    .consumer
+                    .commit_message(msg, rdkafka::consumer::CommitMode::Sync)?;
+                Ok(())
+            }
+            Err(ProcessError::Storage(err)) => {
+                tracing::error!(error = %err, "storage failure; will retry");
+                Err(err)
+            }
         }
     }
+    .instrument(span)
+    .await
 }
 
 async fn send_dlq(kafka: &KafkaIO, payload: &[u8], reason: &str) -> anyhow::Result<()> {

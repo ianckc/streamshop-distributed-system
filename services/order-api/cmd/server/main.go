@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ianckc/distributed-systems/services/order-api/internal/catalog"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/config"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/events"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/handler"
@@ -60,6 +61,10 @@ func main() {
 		}
 	}()
 	orderHandler := handler.OrderHandler{Store: orderStore, Events: publisher}
+	if cfg.CatalogAPIURL != "" {
+		orderHandler.Catalog = catalog.NewClient(cfg.CatalogAPIURL)
+		slog.Info("catalog validation enabled", "url", cfg.CatalogAPIURL)
+	}
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /health", handler.HealthHandler{ServiceName: cfg.ServiceName})

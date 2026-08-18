@@ -10,14 +10,19 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/ianckc/distributed-systems/services/order-api/internal/catalog"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/events"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/model"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/store"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 type OrderHandler struct {
-	Store  store.OrderStore
-	Events events.Publisher
+	Store   store.OrderStore
+	Events  events.Publisher
+	Catalog catalog.ProductGetter
 }
 
 type createOrderRequest struct {
@@ -45,6 +50,11 @@ type errorResponse struct {
 }
 
 func (h OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	tracer := otel.Tracer("order-api")
+	ctx, span := tracer.Start(ctx, "orders.create")
+	defer span.End()
+
 	var req createOrderRequest
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
@@ -53,24 +63,41 @@ func (h OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.Catalog != nil {
+		if err := validateProducts(ctx, h.Catalog, req.Items); err != nil {
+			var validationErr *validationError
+			if errors.As(err, &validationErr) {
+				writeJSON(w, http.StatusBadRequest, errorResponse{Error: validationErr.Error()})
+				return
+			}
+			slog.ErrorContext(ctx, "catalog validation failed", "error", err)
+			writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "catalog unavailable"})
+			return
+		}
+	}
+
 	order, err := buildOrder(req)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse{Error: err.Error()})
 		return
 	}
+	span.SetAttributes(attribute.String("order.id", order.ID.String()))
 
-	created, err := h.Store.CreateOrder(r.Context(), order)
+	created, err := h.Store.CreateOrder(ctx, order)
 	if err != nil {
-		slog.Error("failed to create order", "error", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		slog.ErrorContext(ctx, "failed to create order", "error", err)
 		writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "failed to create order"})
 		return
 	}
 
 	if h.Events != nil {
-		pubCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		pubCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 		if err := h.Events.PublishOrderCreated(pubCtx, created); err != nil {
-			slog.Error("failed to publish order.created", "error", err, "order_id", created.ID)
+			span.RecordError(err)
+			slog.ErrorContext(ctx, "failed to publish order.created", "error", err, "order_id", created.ID)
 		}
 	}
 
@@ -82,6 +109,43 @@ func (h OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Items:      created.Items,
 		CreatedAt:  created.CreatedAt.UTC().Format(time.RFC3339Nano),
 	})
+}
+
+type validationError struct {
+	msg string
+}
+
+func (e *validationError) Error() string { return e.msg }
+
+func validateProducts(ctx context.Context, catalogClient catalog.ProductGetter, items []createOrderItem) error {
+	tracer := otel.Tracer("order-api")
+	ctx, span := tracer.Start(ctx, "orders.validate_products")
+	defer span.End()
+	span.SetAttributes(attribute.Int("order.item_count", len(items)))
+
+	for i, item := range items {
+		product, err := catalogClient.GetProduct(ctx, item.ProductID)
+		if err != nil {
+			if errors.Is(err, catalog.ErrProductNotFound) {
+				msg := fmt.Sprintf("product %q not found", item.ProductID)
+				err := &validationError{msg: msg}
+				span.RecordError(err)
+				span.SetStatus(codes.Error, msg)
+				return err
+			}
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			return fmt.Errorf("catalog lookup %q: %w", item.ProductID, err)
+		}
+		if item.PricePence != product.PricePence {
+			msg := fmt.Sprintf("items[%d].price_pence does not match catalog price for %q", i, item.ProductID)
+			err := &validationError{msg: msg}
+			span.RecordError(err)
+			span.SetStatus(codes.Error, msg)
+			return err
+		}
+	}
+	return nil
 }
 
 func buildOrder(req createOrderRequest) (model.Order, error) {

@@ -28,3 +28,10 @@ def init_telemetry(service_name: str) -> None:
     )
     mp = MeterProvider(resource=resource, metric_readers=[reader])
     metrics.set_meter_provider(mp)
+
+    try:
+        from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
+
+        PsycopgInstrumentor().instrument()
+    except ImportError:
+        pass

@@ -6,6 +6,7 @@ use event_processor::config::Config;
 use event_processor::consume::{handle_message, KafkaIO};
 use event_processor::http::{router, AppState};
 use event_processor::orders::PostgresOrders;
+use event_processor::telemetry::init_propagation;
 use opentelemetry::trace::TracerProvider;
 use tokio::net::TcpListener;
 use tracing_subscriber::layer::SubscriberExt;
@@ -46,6 +47,7 @@ fn init_tracing(service_name: &str) -> Option<opentelemetry_sdk::trace::SdkTrace
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cfg = Config::from_env()?;
+    init_propagation();
     let _provider = init_tracing(&cfg.service_name);
     if _provider.is_none() {
         tracing_subscriber::fmt()

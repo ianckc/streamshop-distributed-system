@@ -6,10 +6,11 @@ import (
 )
 
 type Config struct {
-	Port         string
-	ServiceName  string
-	DatabaseURL  string
-	KafkaBrokers string
+	Port          string
+	ServiceName   string
+	DatabaseURL   string
+	KafkaBrokers  string
+	CatalogAPIURL string
 }
 
 func Load() (Config, error) {
@@ -34,10 +35,11 @@ func Load() (Config, error) {
 	}
 
 	return Config{
-		Port:         port,
-		ServiceName:  serviceName,
-		DatabaseURL:  databaseURL,
-		KafkaBrokers: kafkaBrokers,
+		Port:          port,
+		ServiceName:   serviceName,
+		DatabaseURL:   databaseURL,
+		KafkaBrokers:  kafkaBrokers,
+		CatalogAPIURL: os.Getenv("CATALOG_API_URL"),
 	}, nil
 }
 

@@ -3,6 +3,9 @@ from urllib.parse import urlparse
 
 import clickhouse_connect
 from clickhouse_connect.driver.client import Client
+from opentelemetry import trace
+
+_tracer = trace.get_tracer(__name__)
 
 
 @dataclass(frozen=True)
@@ -40,24 +43,28 @@ class ClickHouseStore:
         self._client.query("SELECT 1")
 
     def order_summary(self) -> OrderSummary:
-        result = self._client.query(
-            """
-            SELECT
-                count() AS order_count,
-                coalesce(sum(total_pence), 0) AS total_revenue_pence,
-                coalesce(avg(total_pence), 0) AS avg_order_value_pence,
-                coalesce(sum(item_count), 0) AS total_items
-            FROM order_events
-            FINAL
-            """
-        )
-        row = result.first_row
-        return OrderSummary(
-            order_count=int(row[0]),
-            total_revenue_pence=int(row[1]),
-            avg_order_value_pence=float(row[2]),
-            total_items=int(row[3]),
-        )
+        with _tracer.start_as_current_span(
+            "clickhouse.order_summary",
+            attributes={"db.system": "clickhouse"},
+        ):
+            result = self._client.query(
+                """
+                SELECT
+                    count() AS order_count,
+                    coalesce(sum(total_pence), 0) AS total_revenue_pence,
+                    coalesce(avg(total_pence), 0) AS avg_order_value_pence,
+                    coalesce(sum(item_count), 0) AS total_items
+                FROM order_events
+                FINAL
+                """
+            )
+            row = result.first_row
+            return OrderSummary(
+                order_count=int(row[0]),
+                total_revenue_pence=int(row[1]),
+                avg_order_value_pence=float(row[2]),
+                total_items=int(row[3]),
+            )
 
     def close(self) -> None:
         self._client.close()
