@@ -15,7 +15,8 @@ Python FastAPI service for read-only analytics: aggregate metrics from ClickHous
 | `GET /api/analytics/orders/summary` | Implemented |
 | `GET /api/analytics/orders/{id}` | Implemented |
 | Traefik routing `/api/analytics/*` | Implemented |
-| OpenTelemetry / metrics | Planned |
+| OpenTelemetry traces and metrics | Implemented (OTLP gRPC; FastAPI + ClickHouse spans; skip when unset) |
+| Prometheus `/metrics` | Planned |
 
 ## Stack
 
@@ -25,6 +26,7 @@ Python FastAPI service for read-only analytics: aggregate metrics from ClickHous
 | Framework | FastAPI + Uvicorn |
 | OLAP | ClickHouse 24 (`clickhouse-connect`) |
 | OLTP | PostgreSQL 18 via `psycopg` |
+| Observability | OpenTelemetry SDK (OTLP gRPC; `FastAPIInstrumentor`) |
 | Port | `3003` (Traefik: `/api/analytics/*`) |
 
 ## Run with Docker Compose
@@ -59,10 +61,14 @@ curl http://localhost:3003/health
 
 ### `GET /ready`
 
-Pings PostgreSQL and ClickHouse.
+Pings PostgreSQL and ClickHouse. Compose healthchecks `/health` (process up).
 
 ```bash
 curl http://localhost:3003/ready
+```
+
+```json
+{"status":"ok","service":"analytics-api"}
 ```
 
 Postgres or ClickHouse unavailable → `503` `{"detail":{"error":"not ready"}}`.
@@ -84,6 +90,8 @@ curl http://localhost:8080/api/analytics/orders/summary
 }
 ```
 
+ClickHouse unavailable → `503` `{"detail":{"error":"failed to fetch order summary"}}`.
+
 ### `GET /api/analytics/orders/{id}`
 
 Order detail from Postgres (order row + line items). Useful for joining OLTP state with ClickHouse facts.
@@ -92,7 +100,18 @@ Order detail from Postgres (order row + line items). Useful for joining OLTP sta
 curl http://localhost:8080/api/analytics/orders/550e8400-e29b-41d4-a716-446655440000
 ```
 
-Unknown order → `404` `{"detail":{"error":"order not found"}}`.
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "user_id": "660e8400-e29b-41d4-a716-446655440001",
+  "status": "processed",
+  "total_pence": 3998,
+  "items": [{"product_id": "prod-001", "qty": 2, "price_pence": 1999}],
+  "created_at": "2026-01-15T12:00:00+00:00"
+}
+```
+
+Unknown order → `404` `{"detail":{"error":"order not found"}}`. Invalid UUID → `422`. Postgres unavailable → `503` `{"detail":{"error":"failed to fetch order"}}`.
 
 ## Demo
 
@@ -116,10 +135,13 @@ curl -s "http://localhost:8080/api/analytics/orders/$ORDER_ID" | python3 -m json
 | `PORT` | `3003` | HTTP listen port |
 | `SERVICE_NAME` | `analytics-api` | Shown in health/ready JSON |
 | `DATABASE_URL` | *(required)* | Postgres URL |
-| `CLICKHOUSE_URL` | *(required)* | HTTP interface (`http://clickhouse:8123`) |
+| `CLICKHOUSE_URL` | `http://localhost:8123` | HTTP interface. Compose: `http://clickhouse:8123` |
 | `CLICKHOUSE_USER` | `streamshop` | ClickHouse user |
 | `CLICKHOUSE_PASSWORD` | `streamshop` | ClickHouse password |
 | `CLICKHOUSE_DATABASE` | `streamshop` | Database with `order_events` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | *(unset)* | OTLP gRPC endpoint. Compose: `http://otel-collector:4317`. Unset or empty → no telemetry export; service still starts |
+
+Compose also reads root `.env` for `ANALYTICS_API_PORT`, `ANALYTICS_API_SERVICE_NAME`, `DATABASE_URL`, `CLICKHOUSE_*`, and `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
 ## Local development (without Docker)
 
@@ -133,6 +155,8 @@ pytest
 python -m analytics_api.main
 ```
 
+Tracing and metrics export to `OTEL_EXPORTER_OTLP_ENDPOINT` when the [observability](../architecture/observability) Compose profile is running; otherwise OpenTelemetry init is skipped.
+
 ## Project layout
 
 ```
@@ -140,6 +164,7 @@ src/analytics_api/
   app.py              FastAPI routes
   main.py             Uvicorn entrypoint
   config.py           Environment configuration
+  telemetry.py        OpenTelemetry init (OTLP gRPC)
   store/postgres.py   Order detail reads
   store/clickhouse.py Summary aggregates
 tests/test_routes.py  Route tests with mocked stores
