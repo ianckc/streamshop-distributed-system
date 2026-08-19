@@ -5,9 +5,9 @@ slug: /intro
 
 # Introduction
 
-**StreamShop** is a fictional UK commerce platform built to demonstrate real-world distributed systems patterns — runnable locally on a developer laptop with Docker Compose.
+**StreamShop** is my showcase repo designed to demonstrate a distributed system. For this project I chose to make it runnable locally using Docker Compose.
 
-Customers browse a product catalog, place orders, and trigger an event pipeline that feeds real-time analytics. The repo is built in phases: each slice is runnable and documented before the next layer is added.
+Customers browse a product catalog, place orders, and trigger an event pipeline that feeds real-time analytics.
 
 ## Implementation status
 
@@ -32,11 +32,22 @@ See [Quick Start](./getting-started/quick-start) to run what exists today.
 
 ## What you'll find here
 
-- **Service docs** — [catalog-api](./services/catalog-api), [order-api](./services/order-api), [event-processor](./services/event-processor), [analytics-api](./services/analytics-api)
-- **Architecture** — target design for gateway, messaging, storage, observability
-- **Data flows** — end-to-end journeys (with built vs planned sections)
-- **ADRs** — design rationale
-- **Runbooks** — reset data, inspect Kafka lag, add a catalog replica
+- **Service docs**
+  - [catalog-api](./services/catalog-api)
+  - [order-api](./services/order-api)
+  - [event-processor](./services/event-processor)
+  - [analytics-api](./services/analytics-api)
+- **Architecture**
+  - target design for gateway
+  - messaging
+  - storage
+  - observability
+- **Data flows**
+  - end-to-end journeys (with built vs planned sections)
+- **ADRs**
+  - design rationale
+- **Runbooks**
+  - reset data, inspect Kafka lag, add a catalog replica
 
 ## Primary audience
 
