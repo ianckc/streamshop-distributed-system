@@ -38,8 +38,8 @@ Full reference: [catalog-api service doc](../services/catalog-api).
 **Why Go:** Strong concurrency model, excellent Postgres client ecosystem
 
 - Writes: PostgreSQL (`orders`, `order_items`); Redpanda (`orders.events`)
+- Reads: Redis (`Idempotency-Key`, when `REDIS_URL` is set)
 - Endpoints: `GET /health`, `GET /ready`, `POST /api/orders`
-- Planned: Redis idempotency
 
 Full reference: [order-api service doc](../services/order-api).
 

@@ -24,7 +24,7 @@ Exactly-once semantics require Kafka transactions, an outbox pattern, and distri
 
 ### Idempotency layers
 
-1. **HTTP layer** — `Idempotency-Key` header stored in Redis (`SET NX EX 3600`)
+1. **HTTP layer (implemented)** — optional `Idempotency-Key` in Redis (`SET NX EX 3600`). Value is JSON: `pending` while creating, then `complete` plus `order_id`. Replay returns the original order (`200`). In-flight duplicate → `409`. Redis unavailable + header present → fail-closed `503`. No header → new order every time.
 2. **Consumer layer** — ClickHouse inserts use `ReplacingMergeTree` or dedup on `order_id`; Postgres status updates are naturally idempotent
 
 ### Offset commit strategy
@@ -34,5 +34,5 @@ The processor commits the Kafka offset **after** successful ClickHouse write and
 ## Consequences
 
 - **Positive:** No message loss; realistic production pattern; simpler than exactly-once
-- **Negative:** Duplicate events possible during failures (handled by idempotency)
-- **Mitigation:** DLQ (`orders.events.dlq`) for messages that fail schema validation or exceed retry limit
+- **Negative:** Duplicate events possible during failures (handled by consumer idempotency). HTTP retries with a key do not create duplicate orders.
+- **Mitigation:** DLQ (`orders.events.dlq`) for messages that fail schema validation. Bounded retries then DLQ for storage failures are not built yet. A transactional outbox for the produce path is not built yet.

@@ -23,7 +23,8 @@ const FeatureList: FeatureItem[] = [
     description: (
       <>
         PostgreSQL for transactions, MongoDB for catalog, ClickHouse for
-        analytics, MinIO for objects, and Redis for caching.
+        analytics, MinIO for objects, and Redis for caching and idempotency
+        keys.
       </>
     ),
   },

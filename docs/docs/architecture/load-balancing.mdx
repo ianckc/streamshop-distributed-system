@@ -48,7 +48,7 @@ upstream catalog {
 | Service | Replicas | Rationale |
 |---------|----------|-----------|
 | `catalog-api` | 2 | Read-heavy, stateless, cache-backed |
-| `order-api` | 1 | Write path; idempotency handles retries |
+| `order-api` | 1 | Write path; `Idempotency-Key` makes client retries safe without a second replica |
 | `analytics-api` | 1 | Query service; scale via read replicas later |
 | `event-processor` | 1 | Kafka consumer group handles parallelism |
 
