@@ -34,11 +34,10 @@ Go HTTP service for creating orders and persisting them to PostgreSQL.
 From the repository root:
 
 ```bash
-cp .env.example .env   # optional
-docker compose up --build
+make up && make seed
 ```
 
-Starts **Traefik**, **nginx**, **postgres**, **mongo**, **redis**, **redisinsight**, **minio**, **redpanda**, **redpanda-console**, **clickhouse**, **event-processor**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Place orders at `http://localhost:8080/api/orders`. Health/ready: `http://localhost:3002/health` and `http://localhost:3002/ready`.
+Place orders at `http://localhost:8080/api/orders`. Health/ready: `http://localhost:3002/health` and `http://localhost:3002/ready`. End-to-end check: `make smoke`.
 
 ## Endpoints
 

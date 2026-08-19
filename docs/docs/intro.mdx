@@ -26,6 +26,7 @@ Customers browse a product catalog, place orders, and trigger an event pipeline 
 | ClickHouse | **Built** (`order_events`) |
 | [analytics-api](./services/analytics-api) — order summary + detail | **Built** |
 | Observability stack | **Built** (`--profile observability`: OTel Collector, Jaeger, Prometheus, Grafana) |
+| Bootstrap | **Built** (`make up`, `make seed`, `make smoke`, `make logs`, `make down`) |
 
 See [Quick Start](./getting-started/quick-start) to run what exists today.
 
@@ -35,7 +36,7 @@ See [Quick Start](./getting-started/quick-start) to run what exists today.
 - **Architecture** — target design for gateway, messaging, storage, observability
 - **Data flows** — end-to-end journeys (with built vs planned sections)
 - **ADRs** — design rationale
-- **Runbooks** — ops tasks for when the full stack exists
+- **Runbooks** — reset data, inspect Kafka lag, add a catalog replica
 
 ## Primary audience
 

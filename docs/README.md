@@ -5,7 +5,7 @@ Built with Docusaurus. Site content lives in `docs/docs/`.
 ## With Docker Compose (recommended)
 
 ```bash
-docker compose up --build
+make up
 ```
 
 Browse at [http://localhost:8080/docs/](http://localhost:8080/docs/) via Traefik.

@@ -8,6 +8,7 @@ sidebar_position: 1
 
 - Docker Desktop or Docker Engine + Compose v2.20+
 - Node.js 20+ (only if you want to run the docs site locally)
+- Python 3 (used by `make smoke` to parse JSON)
 
 ## What works today
 
@@ -21,12 +22,13 @@ sidebar_position: 1
 | MongoDB 8 | Product catalog |
 | Redis 8 | Cache-aside for catalog list/detail (TTL 60s) |
 | Redis Insight | Local GUI on `:5540` (not behind Traefik) |
-| MinIO | Presigned `image_url` on catalog list/detail |
+| MinIO | Presigned `image_url` on catalog list/detail; sample images via `make seed` |
 | Redpanda | Kafka API `:19092`; Console `:8082`; `orders.events` |
 | `event-processor` (Rust) | Consume `order.created` → ClickHouse + Postgres `processed` |
 | ClickHouse 24 | `order_events` on HTTP `:8123` |
 | `analytics-api` (Python) | `GET /api/analytics/orders/summary`, order detail |
 | `docs-site` (Docusaurus) | Static docs at `/docs/` via Traefik |
+| Makefile | `make up`, `make seed`, `make smoke`, `make logs`, `make down` |
 | Observability | `--profile observability`: OTel Collector, Jaeger `:16686`, Prometheus `:9090`, Grafana `:3000` |
 
 ## Run the stack
@@ -35,10 +37,46 @@ From the repository root:
 
 ```bash
 cp .env.example .env   # optional — defaults work out of the box
-docker compose up --build
+make up && make seed && make smoke
 ```
 
-This starts **Traefik**, **nginx**, **docs-site**, **postgres**, **mongo**, **redis**, **redisinsight**, **minio**, **redpanda**, **redpanda-console**, **clickhouse**, **event-processor**, **analytics-api**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Place orders and list products through the gateway on **:8080**; browse docs at [http://localhost:8080/docs/](http://localhost:8080/docs/). Health and debug calls can still hit **:3001** / **:3011** / **:3002** / **:3004** directly. Redis Insight is on **:5540**. MinIO console is on **:9001**. Redpanda Console is on **:8082**. Redpanda Kafka API is on **:19092**. ClickHouse HTTP is on **:8123**.
+| Target | What it does |
+|--------|----------------|
+| `make up` | Builds and starts Compose, waits for healthchecks |
+| `make seed` | Ensures Kafka topics, upserts sample products, uploads MinIO images, flushes Redis |
+| `make smoke` | Lists products, places an order, waits for `processed`, checks analytics |
+| `make logs` | Follows Compose logs |
+| `make down` | Stops the stack (volumes kept) |
+
+This starts **Traefik**, **nginx**, **docs-site**, **postgres**, **mongo**, **redis**, **redisinsight**, **minio**, **redpanda**, **redpanda-console**, **clickhouse**, **event-processor**, **analytics-api**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Gateway: **:8080**. Docs: [http://localhost:8080/docs/](http://localhost:8080/docs/). Redis Insight: **:5540**. MinIO console: **:9001**. Redpanda Console: **:8082**. ClickHouse HTTP: **:8123**.
+
+### 30-second walkthrough
+
+1. Browse products: [http://localhost:8080/api/catalog/products](http://localhost:8080/api/catalog/products)
+2. Place an order (`make smoke`, or the curl below)
+3. Open [Redpanda Console](http://localhost:8082) and inspect topic `orders.events`
+4. The processor sets Postgres `orders.status` to `processed` and writes ClickHouse `order_events`
+5. Hit [http://localhost:8080/api/analytics/orders/summary](http://localhost:8080/api/analytics/orders/summary)
+
+See [order-api](../services/order-api) and [event-processor](../services/event-processor).
+
+### Manual curls (via Traefik)
+
+```bash
+curl http://localhost:8080/api/catalog/products
+curl http://localhost:8080/api/catalog/products/prod-001
+
+curl -s -X POST http://localhost:8080/api/orders \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "user_id": "660e8400-e29b-41d4-a716-446655440001",
+    "items": [{"product_id": "prod-001", "qty": 2, "price_pence": 1999}]
+  }'
+
+curl http://localhost:8080/api/analytics/orders/summary
+```
+
+Mongo products also load from `infra/mongo/seed.js` on first start of an empty volume. `make seed` is idempotent if the volume already exists. See [catalog-api](../services/catalog-api).
 
 ### Health checks (direct)
 
@@ -50,51 +88,26 @@ curl http://localhost:3002/health   # order-api liveness
 curl http://localhost:3002/ready    # order-api Postgres ping
 curl http://localhost:3004/health   # event-processor liveness
 curl http://localhost:3004/ready    # event-processor Postgres + ClickHouse ping
+curl http://localhost:3003/health   # analytics-api liveness
+curl http://localhost:3003/ready    # analytics-api Postgres + ClickHouse ping
 ```
 
-### Create an order (via Traefik)
-
-```bash
-curl -s -X POST http://localhost:8080/api/orders \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "user_id": "660e8400-e29b-41d4-a716-446655440001",
-    "items": [{"product_id": "prod-001", "qty": 2, "price_pence": 1999}]
-  }'
-```
-
-Dashboard: [http://localhost:8081](http://localhost:8081). After a successful order, open Redpanda Console at [http://localhost:8082](http://localhost:8082) and inspect topic `orders.events`. Postgres `orders.status` becomes `processed`; ClickHouse `order_events` gets a row. See [event-processor](../services/event-processor).
-
-See [order-api](../services/order-api) for request fields, errors, and Postgres inspection.
-
-### List products (via Traefik)
-
-```bash
-curl http://localhost:8080/api/catalog/products
-```
-
-Data is seeded into MongoDB on first start. See [catalog-api](../services/catalog-api).
-
-### Get one product (via Traefik)
-
-```bash
-curl http://localhost:8080/api/catalog/products/prod-001
-```
+Traefik dashboard: [http://localhost:8081](http://localhost:8081).
 
 ### Stop
 
 ```bash
-docker compose down
+make down
 ```
 
-To wipe data and re-run Postgres init SQL and Mongo seed: `docker compose down -v`
+To wipe data and re-run Postgres init SQL and Mongo init seed: `docker compose down -v`, then `make up && make seed`.
 
 ## Run the docs site
 
 With Compose (recommended — same URL as in production):
 
 ```bash
-docker compose up --build
+make up
 # http://localhost:8080/docs/
 ```
 

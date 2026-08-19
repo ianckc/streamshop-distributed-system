@@ -17,7 +17,7 @@ Use this runbook to wipe all local data and re-seed the system with fresh sample
 ### 1. Stop all services
 
 ```bash
-docker compose down
+make down
 ```
 
 ### 2. Remove volumes
@@ -31,24 +31,26 @@ This deletes all Postgres, MongoDB, Redis Insight, MinIO, Redpanda, and ClickHou
 ### 3. Restart and seed
 
 ```bash
-docker compose --profile full up -d
-./scripts/seed.sh
+make up
+make seed
 ```
 
-The seed script:
+The seed script (`scripts/seed.sh`):
 
-- Inserts sample products into MongoDB
-- Creates test users in PostgreSQL
-- Creates Redpanda topics (`orders.events`, `orders.events.dlq`)
-- Uploads sample product images to MinIO
+- Upserts sample products into MongoDB (`prod-001` … `prod-003`)
+- Ensures Redpanda topics (`orders.events`, `orders.events.dlq`)
+- Uploads sample product images to MinIO (`infra/minio/sample-images/`)
+- Flushes the Redis catalog cache
+
+There is no users table; orders take a `user_id` UUID in the request body. Mongo also seeds from `infra/mongo/seed.js` on first start of an empty volume.
 
 ### 4. Verify
 
 ```bash
-./scripts/smoke-test.sh
+make smoke
 ```
 
-Expected output: all health checks pass, sample order created and processed within 5 seconds.
+Expected output: catalog list includes `prod-001`, a sample order is created as `pending`, status becomes `processed` within 10 seconds, and `/api/analytics/orders/summary` reports `order_count >= 1`.
 
 ## Reset a single datastore
 
@@ -60,4 +62,4 @@ Expected output: all health checks pass, sample order created and processed with
 | Redis | `docker compose exec redis redis-cli FLUSHALL` |
 | MinIO | `docker compose exec minio mc rm --recursive --force local/product-images/` |
 
-After a partial reset, run `./scripts/seed.sh` to restore sample data.
+After a partial reset, run `make seed` to restore sample catalog data and images.

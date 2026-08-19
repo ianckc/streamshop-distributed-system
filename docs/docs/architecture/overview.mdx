@@ -115,7 +115,7 @@ Docker Compose with optional profiles:
 - **`minimal`** — gateway, core services, Postgres, Redis *(not yet defined)*
 - **`full`** — all databases, Redpanda, MinIO, observability *(not yet defined)*
 
-Today: `docker compose up` runs Traefik, nginx, postgres, mongo, redis, redisinsight, minio, redpanda, redpanda-console, clickhouse, event-processor, order-api, catalog-api-1, and catalog-api-2.
+Today: `make up` (Compose without extra profiles) runs Traefik, nginx, postgres, mongo, redis, redisinsight, minio, redpanda, redpanda-console, clickhouse, event-processor, analytics-api, order-api, catalog-api-1, catalog-api-2, and docs-site. Then `make seed` and `make smoke`.
 
 ## Service responsibilities (target)
 
