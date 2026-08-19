@@ -18,7 +18,7 @@ Go HTTP service for creating orders and persisting them to PostgreSQL.
 | Redpanda event publishing | Implemented (`order.created` → `orders.events`; fail-open) |
 | Catalog product validation | Implemented (when `CATALOG_API_URL` is set) |
 | OpenTelemetry traces and metrics | Implemented (OTLP gRPC; fail-open) |
-| Redis idempotency keys | Handler implemented; Redis not attached in `cmd/server` yet |
+| Redis idempotency keys | Implemented (when `REDIS_URL` is set) |
 
 ## Stack
 
@@ -29,7 +29,7 @@ Go HTTP service for creating orders and persisting them to PostgreSQL.
 | Database | PostgreSQL 18 via `pgx` |
 | Events | Redpanda via kafka-go |
 | Catalog | HTTP client (`CATALOG_API_URL`) |
-| Redis | go-redis (connect/ping when `REDIS_URL` is set). Handler supports `Idempotency-Key`; the server does not attach the Redis store yet. |
+| Redis | go-redis. When `REDIS_URL` is set, order-api pings Redis at startup and honours `Idempotency-Key` on `POST /api/orders`. |
 | Observability | OpenTelemetry SDK (OTLP gRPC) |
 | Port | `3002` (default) |
 
@@ -111,7 +111,7 @@ Create an order. Amounts are in **pence** (GBP minor units).
 
 When `CATALOG_API_URL` is set (Compose default `http://nginx`), each item is looked up on [catalog-api](./catalog-api); unknown products or a `price_pence` that does not match the catalog return `400`. Catalog unreachable → `503` `{"error":"catalog unavailable"}`. If `CATALOG_API_URL` is empty, validation is skipped.
 
-Optional header `Idempotency-Key`: the handler reserves the key before insert (`SET NX`). First success → `201` and stores the `order_id`. Replay → `200` with the original order (no second insert, no second Kafka publish). In-flight duplicate → `409`. Redis error, or a key sent when Redis is not attached to the handler → `503` `{"error":"idempotency unavailable"}`. No header → current behaviour (new order every time). Catalog and JSON validation run **before** the Redis reservation so a `400` does not leave a pending key.
+Optional header `Idempotency-Key`: when `REDIS_URL` is set, the handler reserves the key before insert (`SET NX`). First success → `201` and stores the `order_id`. Replay → `200` with the original order (no second insert, no second Kafka publish). In-flight duplicate → `409`. Redis error, or a key sent when `REDIS_URL` is empty → `503` `{"error":"idempotency unavailable"}`. No header → current behaviour (new order every time). Catalog and JSON validation run **before** the Redis reservation so a `400` does not leave a pending key.
 
 `total_pence` is computed server-side (`qty × price_pence` per item). After the Postgres commit, `order.created` is published to Redpanda topic `orders.events` (auto-created on first produce). If Redpanda is down, the order is still saved and `201` is returned (fail-open; error logged). `/ready` still pings Postgres only. The `201` body shows `status: "pending"`; [event-processor](./event-processor) later sets it to `processed`.
 
@@ -132,10 +132,17 @@ docker compose exec redpanda rpk topic consume orders.events --num 1
 ```bash
 curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: demo-001' \
   -d '{
     "user_id": "660e8400-e29b-41d4-a716-446655440001",
     "items": [{"product_id": "prod-001", "qty": 2, "price_pence": 1999}]
   }'
+```
+
+Repeat the same request to get `200` and the same `id`. Inspect the Redis key:
+
+```bash
+docker compose exec redis redis-cli GET 'idempotency:demo-001'
 ```
 
 ### Inspect Postgres
@@ -155,7 +162,7 @@ docker compose exec postgres \
 | `DATABASE_URL` | *(required)* | Postgres connection string |
 | `KAFKA_BROKERS` | *(required)* | Kafka bootstrap (Compose: `redpanda:9092`; host: `localhost:19092`) |
 | `CATALOG_API_URL` | *(empty)* | Catalog base URL; empty disables product validation. Compose: `http://nginx`; host: `http://localhost:8080` |
-| `REDIS_URL` | *(empty)* | Redis connection string. Empty skips Redis. Set in Compose (`redis://redis:6379`). Invalid URL or ping failure → process exits. Idempotency keys are not used yet. |
+| `REDIS_URL` | *(empty)* | Redis connection string. Empty skips Redis and ignores `Idempotency-Key` with `503`. Compose: `redis://redis:6379`. Invalid URL or ping failure → process exits. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | *(SDK default)* | OTLP gRPC endpoint. Compose: `http://otel-collector:4317`. Collector down → service still starts |
 
 Compose also reads root `.env` for `ORDER_API_PORT`, `ORDER_API_SERVICE_NAME`, `DATABASE_URL`, `KAFKA_BROKERS`, `CATALOG_API_URL`, `REDIS_URL`, and `OTEL_EXPORTER_OTLP_ENDPOINT`.
@@ -188,7 +195,7 @@ go test -coverprofile=coverage.out -coverpkg=./... ./...
 go tool cover -html=coverage.out -o coverage.html
 ```
 
-Handler tests use a fake store, publisher, and idempotency store — no database, Redis, or Redpanda required. Postgres store tests are not yet added. The create handler implements `Idempotency-Key`; `cmd/server` does not pass a Redis-backed store yet.
+Handler tests use a fake store, publisher, and idempotency store — no database, Redis, or Redpanda required. Postgres store tests are not yet added. With `REDIS_URL` set, `cmd/server` attaches the Redis-backed idempotency store.
 
 ## Project layout
 

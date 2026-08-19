@@ -14,6 +14,7 @@ import (
 	"github.com/ianckc/distributed-systems/services/order-api/internal/config"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/events"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/handler"
+	"github.com/ianckc/distributed-systems/services/order-api/internal/idempotency"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/redisclient"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/store/postgres"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/telemetry"
@@ -54,6 +55,15 @@ func main() {
 	}
 	defer pool.Close()
 
+	orderStore := postgres.NewOrderStore(pool)
+	publisher := events.NewKafkaPublisher(cfg.KafkaBrokers)
+	defer func() {
+		if err := publisher.Close(); err != nil {
+			slog.Error("failed to close kafka publisher", "error", err)
+		}
+	}()
+	orderHandler := handler.OrderHandler{Store: orderStore, Events: publisher}
+
 	if cfg.RedisURL != "" {
 		redisCtx, redisCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		redisClient, err := redisclient.Connect(redisCtx, cfg.RedisURL)
@@ -67,17 +77,10 @@ func main() {
 				slog.Error("failed to close redis", "error", err)
 			}
 		}()
-		slog.Info("redis connected")
+		orderHandler.Idempotency = idempotency.NewStore(idempotency.NewRedisBackend(redisClient))
+		slog.Info("idempotency keys enabled")
 	}
 
-	orderStore := postgres.NewOrderStore(pool)
-	publisher := events.NewKafkaPublisher(cfg.KafkaBrokers)
-	defer func() {
-		if err := publisher.Close(); err != nil {
-			slog.Error("failed to close kafka publisher", "error", err)
-		}
-	}()
-	orderHandler := handler.OrderHandler{Store: orderStore, Events: publisher}
 	if cfg.CatalogAPIURL != "" {
 		orderHandler.Catalog = catalog.NewClient(cfg.CatalogAPIURL)
 		slog.Info("catalog validation enabled", "url", cfg.CatalogAPIURL)

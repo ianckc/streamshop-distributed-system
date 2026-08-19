@@ -98,7 +98,7 @@ KAFKA_BROKERS=localhost:19092
 REDIS_URL=redis://localhost:6379
 ```
 
-Copy from `services/order-api/.env.example`. `DATABASE_URL` and `KAFKA_BROKERS` are **required**. `REDIS_URL` is optional; when set, order-api pings Redis at startup (idempotency keys are not used yet). `OTEL_EXPORTER_OTLP_ENDPOINT` is used when the [observability](../architecture/observability) profile is running; otherwise the SDK fails open.
+Copy from `services/order-api/.env.example`. `DATABASE_URL` and `KAFKA_BROKERS` are **required**. `REDIS_URL` is optional; when set, order-api pings Redis at startup and honours `Idempotency-Key` on `POST /api/orders`. `OTEL_EXPORTER_OTLP_ENDPOINT` is used when the [observability](../architecture/observability) profile is running; otherwise the SDK fails open.
 
 ## Environment variables (catalog-api)
 
