@@ -7,22 +7,31 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/catalog"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/events"
+	"github.com/ianckc/distributed-systems/services/order-api/internal/idempotency"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/model"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/store"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
+type IdempotencyStore interface {
+	Begin(ctx context.Context, key string) (acquired bool, existing idempotency.Record, err error)
+	Complete(ctx context.Context, key string, orderID uuid.UUID) error
+}
+
 type OrderHandler struct {
-	Store   store.OrderStore
-	Events  events.Publisher
-	Catalog catalog.ProductGetter
+	Store       store.OrderStore
+	Events      events.Publisher
+	Catalog     catalog.ProductGetter
+	Idempotency IdempotencyStore
 }
 
 type createOrderRequest struct {
@@ -81,6 +90,27 @@ func (h OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, errorResponse{Error: err.Error()})
 		return
 	}
+
+	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if idempotencyKey != "" {
+		if h.Idempotency == nil {
+			writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "idempotency unavailable"})
+			return
+		}
+		acquired, existing, err := h.Idempotency.Begin(ctx, idempotencyKey)
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			slog.ErrorContext(ctx, "idempotency begin failed", "error", err)
+			writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "idempotency unavailable"})
+			return
+		}
+		if !acquired {
+			h.replayOrConflict(ctx, w, span, existing)
+			return
+		}
+	}
+
 	span.SetAttributes(attribute.String("order.id", order.ID.String()))
 
 	created, err := h.Store.CreateOrder(ctx, order)
@@ -92,6 +122,13 @@ func (h OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if idempotencyKey != "" {
+		if err := h.Idempotency.Complete(ctx, idempotencyKey, created.ID); err != nil {
+			span.RecordError(err)
+			slog.ErrorContext(ctx, "idempotency complete failed", "error", err, "order_id", created.ID)
+		}
+	}
+
 	if h.Events != nil {
 		pubCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
@@ -101,14 +138,43 @@ func (h OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusCreated, createOrderResponse{
-		ID:         created.ID.String(),
-		UserID:     created.UserID.String(),
-		Status:     created.Status,
-		TotalPence: created.TotalPence,
-		Items:      created.Items,
-		CreatedAt:  created.CreatedAt.UTC().Format(time.RFC3339Nano),
-	})
+	writeJSON(w, http.StatusCreated, orderResponse(created))
+}
+
+func (h OrderHandler) replayOrConflict(ctx context.Context, w http.ResponseWriter, span trace.Span, existing idempotency.Record) {
+	if existing.State == idempotency.StatePending {
+		writeJSON(w, http.StatusConflict, errorResponse{Error: "idempotency key in progress"})
+		return
+	}
+	if existing.State != idempotency.StateComplete {
+		writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "idempotency unavailable"})
+		return
+	}
+
+	span.SetAttributes(
+		attribute.Bool("idempotency.replay", true),
+		attribute.String("order.id", existing.OrderID.String()),
+	)
+	order, err := h.Store.GetOrder(ctx, existing.OrderID)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		slog.ErrorContext(ctx, "idempotency replay failed", "error", err, "order_id", existing.OrderID)
+		writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "failed to load order"})
+		return
+	}
+	writeJSON(w, http.StatusOK, orderResponse(order))
+}
+
+func orderResponse(order model.Order) createOrderResponse {
+	return createOrderResponse{
+		ID:         order.ID.String(),
+		UserID:     order.UserID.String(),
+		Status:     order.Status,
+		TotalPence: order.TotalPence,
+		Items:      order.Items,
+		CreatedAt:  order.CreatedAt.UTC().Format(time.RFC3339Nano),
+	}
 }
 
 type validationError struct {

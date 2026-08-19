@@ -37,7 +37,7 @@ flowchart LR
 - **order-api** on `:3002` — `GET /health`, `GET /ready`, `POST /api/orders` (Postgres write then `order.created`)
 - **PostgreSQL** — `orders` and `order_items` tables
 - **MongoDB** — `products` collection
-- **Redis** — cache-aside for catalog list/detail (TTL 60s; fail-open)
+- **Redis** — catalog cache-aside (TTL 60s; fail-open) and order-api `Idempotency-Key` (fail-closed when the header is present)
 - **Redis Insight** on `:5540` — local GUI; not behind Traefik
 - **MinIO** — S3 API `:9000`, console `:9001`; buckets `product-images` and `exports`; catalog-api returns presigned `image_url` on product reads (upload via API is planned)
 - **Redpanda** v26.2.1 — Kafka API `:19092` (host), `redpanda:9092` (Compose); `orders.events` from order-api
@@ -122,13 +122,13 @@ Docker Compose from the repo root. Default `make up` starts the application stac
 | Service | Owns writes to | Reads from |
 |---------|----------------|------------|
 | `catalog-api` | MongoDB, MinIO | Redis (cache) |
-| `order-api` | PostgreSQL, Redpanda | — |
+| `order-api` | PostgreSQL, Redpanda | Redis (idempotency keys) |
 | `event-processor` | ClickHouse, PostgreSQL (status) | Redpanda |
 | `analytics-api` | — (read-only) | ClickHouse, PostgreSQL |
 
 **catalog-api today:** two replicas behind nginx; `GET /health`, `GET /ready` (Mongo ping), `GET /api/catalog/products`, and `GET /api/catalog/products/:id` with Redis cache-aside and MinIO presigned `image_url`; upload via the API is not wired yet.
 
-**order-api today:** writes to PostgreSQL then publishes `order.created` to `orders.events` (fail-open); exposes `GET /health`, `GET /ready` (Postgres ping), and `POST /api/orders` (no tracing or metrics yet).
+**order-api today:** writes to PostgreSQL then publishes `order.created` to `orders.events` (fail-open); optional `Idempotency-Key` via Redis; exposes `GET /health`, `GET /ready` (Postgres ping), and `POST /api/orders`.
 
 **event-processor today:** consumes `orders.events`, inserts ClickHouse `order_events`, sets Postgres `orders.status = processed`, then commits the offset. Invalid payloads go to `orders.events.dlq`.
 
@@ -138,7 +138,7 @@ Docker Compose from the repo root. Default `make up` starts the application stac
 |-----------|------------|-----|--------|
 | API Gateway | Traefik v3 | [API Gateway](./api-gateway) | **Built** (`/api/orders`, `/api/catalog`, `/api/analytics`, `/docs`) |
 | Load Balancer | nginx | [Load Balancing](./load-balancing) | **Built** (2× catalog-api) |
-| Cache | Redis 8 | [Caching](./caching) | **Built** (cache-aside, 60s TTL) |
+| Cache | Redis 8 | [Caching](./caching) | **Built** (catalog cache-aside + order idempotency keys) |
 | Message Queue | Redpanda | [Messaging](./messaging) | **Built** (produce + consume) |
 | SQL (OLTP) | PostgreSQL 18 | [Storage](./storage) | **Built** |
 | NoSQL | MongoDB 8 | [Storage](./storage) | **Built** |

@@ -13,6 +13,7 @@ sequenceDiagram
   participant Client
   participant Traefik
   participant OrderAPI as order-api_Go
+  participant Redis
   participant Postgres
   participant Redpanda
   participant Processor as event-processor_Rust
@@ -20,12 +21,28 @@ sequenceDiagram
 
   Client->>Traefik: POST /api/orders
   Traefik->>OrderAPI: forward request
-  OrderAPI->>OrderAPI: validate JSON
-  OrderAPI->>Postgres: BEGIN transaction, insert order and items
-  Postgres-->>OrderAPI: committed
-  OrderAPI->>Redpanda: publish order.created
-  OrderAPI-->>Traefik: 201 Created with order_id
-  Traefik-->>Client: 201 Created with order_id
+  OrderAPI->>OrderAPI: validate JSON and catalog prices
+  alt Idempotency-Key present
+    OrderAPI->>Redis: SET NX pending EX 3600
+    alt key already complete
+      Redis-->>OrderAPI: order_id
+      OrderAPI->>Postgres: SELECT order
+      OrderAPI-->>Client: 200 original order
+    else key pending
+      OrderAPI-->>Client: 409 in progress
+    else acquired
+      OrderAPI->>Postgres: BEGIN transaction, insert order and items
+      Postgres-->>OrderAPI: committed
+      OrderAPI->>Redis: SET complete order_id EX 3600
+      OrderAPI->>Redpanda: publish order.created
+      OrderAPI-->>Client: 201 Created
+    end
+  else no header
+    OrderAPI->>Postgres: BEGIN transaction, insert order and items
+    Postgres-->>OrderAPI: committed
+    OrderAPI->>Redpanda: publish order.created
+    OrderAPI-->>Client: 201 Created
+  end
   Redpanda->>Processor: deliver order.created
   Processor->>ClickHouse: INSERT order_events
   Processor->>Postgres: UPDATE status processed
@@ -45,6 +62,7 @@ Or place an order by hand:
 ```bash
 curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: demo-001' \
   -d '{
     "user_id": "660e8400-e29b-41d4-a716-446655440001",
     "items": [
@@ -55,14 +73,16 @@ curl -s -X POST http://localhost:8080/api/orders \
 
 What happens:
 
-1. JSON body is validated (`user_id` UUID, non-empty `items`, positive `qty`, `price_pence` &gt;= 0)
+1. JSON body is validated (`user_id` UUID, non-empty `items`, positive `qty`, `price_pence` &gt;= 0); catalog prices are checked when `CATALOG_API_URL` is set
 2. `total_pence` is computed server-side
-3. Order + line items inserted in one Postgres transaction
-4. `order.created` published to `orders.events` (fail-open if Redpanda is down)
-5. `201` response with order JSON (`status: "pending"`)
-6. event-processor inserts ClickHouse `order_events` and sets Postgres status to `processed`
+3. If `Idempotency-Key` is sent, Redis `SET NX` reserves the key (replay → `200`, in-flight → `409`)
+4. Order + line items inserted in one Postgres transaction
+5. Redis key updated to `complete` with `order_id`
+6. `order.created` published to `orders.events` (fail-open if Redpanda is down)
+7. `201` response with order JSON (`status: "pending"`)
+8. event-processor inserts ClickHouse `order_events` and sets Postgres status to `processed`
 
-Not implemented yet: idempotency keys.
+The header is optional. Omit it and every POST creates a new order.
 
 Full API details: [order-api](../services/order-api).
 
@@ -103,19 +123,22 @@ sequenceDiagram
 
 ### Planned steps after order creation
 
-- **Idempotency** — `Idempotency-Key` header + Redis *(not built)*
+- **Idempotency** — `Idempotency-Key` header + Redis *(built)*
 - **Event publish** — `order.created` to Redpanda topic `orders.events` *(built; fail-open)*
 - **Async processing** — Rust consumer → ClickHouse + status update *(built)*
 - **Analytics** — `GET /api/analytics/orders/summary` via Traefik *(built)*
 
-### Planned failure behaviour
+### Failure behaviour
 
-| Failure | Target behaviour |
+| Failure | Behaviour |
 |---------|------------------|
 | Postgres unavailable | `503` from order-api; no event published |
+| Redis unavailable + `Idempotency-Key` | `503` `idempotency unavailable`; no order created |
+| Redis unavailable, no header | Order created as usual |
+| Duplicate `Idempotency-Key` (complete) | `200` with the original order |
+| Duplicate `Idempotency-Key` (in progress) | `409` |
 | Redpanda unavailable | Order saved; `201`; error logged *(outbox planned)* |
 | Processor crash | Offset not committed; redelivery on restart |
 | Invalid event schema | Message to `orders.events.dlq` |
-| Duplicate idempotency key | Return original order |
 
 See [Inspect Kafka lag](../runbooks/inspect-kafka-lag) if `orders.status` stays `pending`.

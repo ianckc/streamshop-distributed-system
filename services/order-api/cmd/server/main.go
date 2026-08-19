@@ -14,6 +14,8 @@ import (
 	"github.com/ianckc/distributed-systems/services/order-api/internal/config"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/events"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/handler"
+	"github.com/ianckc/distributed-systems/services/order-api/internal/idempotency"
+	"github.com/ianckc/distributed-systems/services/order-api/internal/redisclient"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/store/postgres"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/telemetry"
 )
@@ -61,6 +63,24 @@ func main() {
 		}
 	}()
 	orderHandler := handler.OrderHandler{Store: orderStore, Events: publisher}
+
+	if cfg.RedisURL != "" {
+		redisCtx, redisCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		redisClient, err := redisclient.Connect(redisCtx, cfg.RedisURL)
+		redisCancel()
+		if err != nil {
+			slog.Error("failed to connect to redis", "error", err)
+			os.Exit(1)
+		}
+		defer func() {
+			if err := redisClient.Close(); err != nil {
+				slog.Error("failed to close redis", "error", err)
+			}
+		}()
+		orderHandler.Idempotency = idempotency.NewStore(idempotency.NewRedisBackend(redisClient))
+		slog.Info("idempotency keys enabled")
+	}
+
 	if cfg.CatalogAPIURL != "" {
 		orderHandler.Catalog = catalog.NewClient(cfg.CatalogAPIURL)
 		slog.Info("catalog validation enabled", "url", cfg.CatalogAPIURL)

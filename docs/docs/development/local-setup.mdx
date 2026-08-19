@@ -95,11 +95,10 @@ PORT=3002
 SERVICE_NAME=order-api
 DATABASE_URL=postgres://streamshop:streamshop@localhost:5432/streamshop?sslmode=disable
 KAFKA_BROKERS=localhost:19092
+REDIS_URL=redis://localhost:6379
 ```
 
-Copy from `services/order-api/.env.example`. `DATABASE_URL` and `KAFKA_BROKERS` are **required**.
-
-Future variables (not used yet): `REDIS_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT`.
+Copy from `services/order-api/.env.example`. `DATABASE_URL` and `KAFKA_BROKERS` are **required**. `REDIS_URL` is optional; when set, order-api pings Redis at startup and honours `Idempotency-Key` on `POST /api/orders`. `OTEL_EXPORTER_OTLP_ENDPOINT` is used when the [observability](../architecture/observability) profile is running; otherwise the SDK fails open.
 
 ## Environment variables (catalog-api)
 

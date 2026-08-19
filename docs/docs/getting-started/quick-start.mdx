@@ -16,11 +16,11 @@ sidebar_position: 1
 |-----------|--------|
 | Traefik v3 | `:8080` → `/api/orders`, `/api/catalog`, `/api/analytics`, `/docs/`; dashboard `:8081` |
 | nginx | Round-robin to 2× catalog-api |
-| `order-api` (Go) | `GET /health`, `GET /ready`, `POST /api/orders` → Postgres + `order.created` |
+| `order-api` (Go) | `GET /health`, `GET /ready`, `POST /api/orders` → Postgres + optional `Idempotency-Key` + `order.created` |
 | `catalog-api` (Node) | 2 replicas; health, ready, product list/detail, MinIO `image_url` |
 | PostgreSQL 18 | Order persistence |
 | MongoDB 8 | Product catalog |
-| Redis 8 | Cache-aside for catalog list/detail (TTL 60s) |
+| Redis 8 | Catalog cache-aside (TTL 60s) and order-api idempotency keys |
 | Redis Insight | Local GUI on `:5540` (not behind Traefik) |
 | MinIO | Presigned `image_url` on catalog list/detail; sample images via `make seed` |
 | Redpanda | Kafka API `:19092`; Console `:8082`; `orders.events` |

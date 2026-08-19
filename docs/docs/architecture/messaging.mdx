@@ -67,7 +67,7 @@ docker compose exec redpanda rpk topic consume orders.events --num 1
 
 **Today (produce path):** order-api writes to Postgres, then publishes. If produce fails, the order still exists (`201`, error logged). That is a dual-write gap — an outbox is planned, not built.
 
-ReplacingMergeTree on `order_id` and an idempotent Postgres status update keep duplicate deliveries from stacking extra facts. HTTP idempotency keys are still planned.
+ReplacingMergeTree on `order_id` and an idempotent Postgres status update keep duplicate deliveries from stacking extra facts. HTTP `Idempotency-Key` on order-api (Redis `SET NX EX 3600`) stops client retries from inserting a second order. A transactional outbox for the produce path is still planned.
 
 ## Consumer group
 
