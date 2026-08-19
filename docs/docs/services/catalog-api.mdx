@@ -14,9 +14,11 @@ Node.js HTTP service for the product catalog.
 | `GET /ready` | Implemented |
 | `GET /api/catalog/products` | Implemented |
 | `GET /api/catalog/products/:id` | Implemented |
+| Traefik route (`/api/catalog` on `:8080`) | Implemented (via nginx) |
 | MongoDB persistence | Implemented |
 | Redis cache-aside | Implemented (60s TTL; fail-open) |
 | MinIO image URLs | Implemented (presigned GET; `{id}.png`) |
+| OpenTelemetry traces and metrics | Implemented (OTLP gRPC; fail-open) |
 | MinIO image upload | Planned |
 | Nginx replicas | Implemented (2 behind nginx, round_robin) |
 
@@ -29,6 +31,7 @@ Node.js HTTP service for the product catalog.
 | Database | MongoDB 8 via official driver |
 | Cache | Redis 8, cache-aside |
 | Objects | MinIO (`product-images`) |
+| Observability | OpenTelemetry SDK (OTLP gRPC; auto-instrumentation) |
 | Port | `3001` (replica 1; replica 2 is `3011`) |
 
 ## Run with Docker Compose
@@ -115,10 +118,10 @@ curl http://localhost:8080/api/catalog/products/prod-001
 }
 ```
 
-| Status | When |
-|--------|------|
-| `404` | Unknown id |
-| `503` | Mongo unavailable |
+| Status | When | Body |
+|--------|------|------|
+| `404` | Unknown id | `{"error":"product not found"}` |
+| `503` | Mongo unavailable | `{"error":"failed to get product"}` |
 
 ### Inspect Mongo
 
@@ -160,6 +163,9 @@ curl -s http://localhost:8080/api/catalog/products/prod-001 | jq .image_url
 | `S3_SECRET_KEY` | *(required)* | MinIO root password |
 | `S3_BUCKET` | `product-images` | Image bucket |
 | `S3_REGION` | `us-east-1` | Required by the AWS SDK; unused by MinIO |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | *(SDK default)* | OTLP gRPC endpoint. Compose: `http://otel-collector:4317`. Collector down → service still starts |
+
+Compose also reads root `.env` for `CATALOG_API_PORT`, `CATALOG_API_2_PORT`, `MONGODB_URI`, `REDIS_URL`, `S3_*`, and `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
 ## Local development (without running the app in Docker)
 
@@ -173,6 +179,8 @@ npm start
 
 `MONGODB_URI`, `REDIS_URL`, and `S3_*` in `.env.example` point at `localhost`. Inside Compose the hostnames are `mongo`, `redis`, and `minio`.
 
+`npm start` loads OpenTelemetry via `--import ./src/instrumentation.ts`. Tracing and metrics export to `OTEL_EXPORTER_OTLP_ENDPOINT` when the [observability](../architecture/observability) Compose profile is running; otherwise OpenTelemetry init fails open.
+
 ## Tests
 
 ```bash
@@ -181,24 +189,25 @@ npm run test:coverage
 npm run lint
 ```
 
-`npm run lint:fix` applies Biome format and lint fixes. Handler tests use an in-memory fake store, cache, and image store — no Mongo, Redis, or MinIO required. Coverage is printed in the terminal; HTML is written to `coverage/index.html`. Excluded: `src/server.ts` (process entrypoint) and type-only modules. `src/store/mongo.ts` stays in the report at 0% until Mongo is tested (mock or Testcontainers). `src/cache/redis.ts` `connectRedis` is untested; `RedisProductCache` is covered with a fake client. `src/images/s3.ts` is untested against MinIO (unit tests use the in-memory image store).
+`npm run lint:fix` applies Biome format and lint fixes. Handler tests use an in-memory fake store, cache, and image store — no Mongo, Redis, or MinIO required. Coverage is printed in the terminal; HTML is written to `coverage/index.html`. Excluded: `src/server.ts` (process entrypoint) and type-only modules. `src/instrumentation.ts` stays in the report and is untested. `src/store/mongo.ts` stays in the report at 0% until Mongo is tested (mock or Testcontainers). `src/cache/redis.ts` `connectRedis` is untested; `RedisProductCache` is covered with a fake client. `src/images/s3.ts` is untested against MinIO (unit tests use the in-memory image store).
 
 ## Project layout
 
 ```
-src/app.ts            Fastify app and routes
-src/cache.ts          Cache-aside helper and key names
-src/cache/memory.ts   In-memory cache (tests)
-src/cache/redis.ts    Redis cache
-src/images.ts         Presigned URL helper
-src/images/memory.ts  In-memory images (tests)
-src/images/s3.ts      MinIO/S3 images
-src/products.ts       Product type
-src/store.ts          ProductStore interface
-src/store/memory.ts   In-memory store (tests)
-src/store/mongo.ts    MongoDB store
-src/server.ts         HTTP listen entrypoint
-src/app.test.ts       Handler tests
-src/cache.test.ts     Cache-aside tests
-src/images.test.ts    Image URL tests
+src/app.ts                Fastify app and routes
+src/cache.ts              Cache-aside helper and key names
+src/cache/memory.ts       In-memory cache (tests)
+src/cache/redis.ts        Redis cache
+src/images.ts             Presigned URL helper
+src/images/memory.ts      In-memory images (tests)
+src/images/s3.ts          MinIO/S3 images
+src/instrumentation.ts    OpenTelemetry SDK (loaded via --import)
+src/products.ts           Product type
+src/store.ts              ProductStore interface
+src/store/memory.ts       In-memory store (tests)
+src/store/mongo.ts        MongoDB store
+src/server.ts             HTTP listen entrypoint
+src/app.test.ts           Handler tests
+src/cache.test.ts         Cache-aside tests
+src/images.test.ts        Image URL tests
 ```
