@@ -41,7 +41,7 @@ CREATE TABLE order_items (
 
 ## MongoDB (NoSQL)
 
-Document store for the product catalog. Products have variable attributes — colour, size, material — that don't fit a rigid relational schema.
+Document store for the product catalog. Products have variable attributes: colour, size, material, that don't fit a rigid relational schema.
 
 ```json
 {
@@ -62,7 +62,7 @@ Seed documents live in `infra/mongo/seed.js` (first start of an empty volume) an
 
 ## Redis (Cache)
 
-In-memory cache for hot catalog reads and (later) order idempotency keys. Redis is **not** a primary datastore — Mongo remains the source of truth. There is no Compose volume; cache is ephemeral by design.
+In-memory cache for hot catalog reads and (later) order idempotency keys. Redis is **not** a primary datastore. Mongo remains the source of truth. There is no Compose volume; cache is ephemeral by design.
 
 **Today:** Redis 8 runs in Compose on `:6379` (no password). catalog-api cache-aside uses `REDIS_URL`; TTL is 60 seconds. Redis down does not fail product reads. See [Caching](./caching).
 
@@ -90,7 +90,7 @@ ORDER BY (order_id);
 
 **Accessed by:** `event-processor` (writes), `analytics-api` (reads)
 
-**Today:** ClickHouse 24 runs in Compose. HTTP interface on `:8123` (native `:9000` is not published — MinIO uses that port). User/password `streamshop` / `streamshop`. Data is on the `clickhouse_data` volume. `infra/clickhouse/init.sql` creates `streamshop.order_events`. event-processor writes rows; analytics-api reads aggregates via `GET /api/analytics/orders/summary`.
+**Today:** ClickHouse 24 runs in Compose. HTTP interface on `:8123` (native `:9000` is not published as MinIO uses that port). User/password `streamshop` / `streamshop`. Data is on the `clickhouse_data` volume. `infra/clickhouse/init.sql` creates `streamshop.order_events`. event-processor writes rows; analytics-api reads aggregates via `GET /api/analytics/orders/summary`.
 
 ```bash
 curl -s http://localhost:8123/ping

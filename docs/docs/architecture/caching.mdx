@@ -4,11 +4,11 @@ sidebar_position: 4
 
 # Caching
 
-StreamShop uses **Redis 8** as an in-memory cache. Redis is never used as a primary datastore — this keeps the durable vs ephemeral storage story clear.
+StreamShop uses **Redis 8** as an in-memory cache. Redis is never used as a primary datastore. This keeps the durable vs ephemeral storage story clear.
 
 ## What's running today
 
-Redis is in Docker Compose (`localhost:6379`, no password) and is **shared** across the two catalog-api replicas behind nginx. catalog-api uses **cache-aside** on product list and detail: Redis first, Mongo on miss, then `SET` with TTL **60 seconds**. Redis stores Mongo fields only; presigned `image_url` values are attached after the cache so they do not sit in Redis until they expire. Redis down does not fail the request — Mongo still serves (`x-cache: miss`). `/ready` pings Mongo only.
+Redis is in Docker Compose (`localhost:6379`, no password) and is **shared** across the two catalog-api replicas behind nginx. catalog-api uses **cache-aside** on product list and detail: Redis first, Mongo on miss, then `SET` with TTL **60 seconds**. Redis stores Mongo fields only; presigned `image_url` values are attached after the cache so they do not sit in Redis until they expire. Redis down does not fail the request, Mongo still serves (`x-cache: miss`). `/ready` pings Mongo only.
 
 Redis Insight is a local debug GUI on [http://localhost:5540](http://localhost:5540) (not behind Traefik). It is preconnected to the Compose Redis service as `streamshop`.
 

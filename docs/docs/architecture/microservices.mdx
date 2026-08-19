@@ -4,7 +4,7 @@ sidebar_position: 6
 
 # Microservices
 
-StreamShop is polyglot by design — each language handles a role that fits its strengths, not four identical CRUD apps.
+StreamShop is polyglot by design. Each language handles a role that fits its strengths, not four identical CRUD apps.
 
 ## Service map (target)
 
@@ -21,10 +21,11 @@ StreamShop is polyglot by design — each language handles a role that fits its 
 
 **Responsibility:** Product reads, Redis cache-aside, MinIO image URLs; image upload planned.
 
+**Why Node.js:** Fast I/O for HTTP-heavy read workloads; rich AWS SDK for MinIO
+
 - Endpoints: `GET /health`, `GET /ready`, `GET /api/catalog/products`, `GET /api/catalog/products/:id`
 - Writes/reads: MongoDB (`products`); Redis cache (list + detail); MinIO (`product-images` reads)
 - Planned: MinIO image upload
-- Why Node.js: Fast I/O for HTTP-heavy read workloads; rich AWS SDK for MinIO
 
 Full reference: [catalog-api service doc](../services/catalog-api).
 
@@ -34,19 +35,21 @@ Full reference: [catalog-api service doc](../services/catalog-api).
 
 **Responsibility:** Order creation, Postgres transactions, Redpanda produce.
 
+**Why Go:** Strong concurrency model, excellent Postgres client ecosystem
+
 - Writes: PostgreSQL (`orders`, `order_items`); Redpanda (`orders.events`)
 - Endpoints: `GET /health`, `GET /ready`, `POST /api/orders`
 - Planned: Redis idempotency
 
 Full reference: [order-api service doc](../services/order-api).
 
-- Why Go: Strong concurrency model, excellent Postgres client ecosystem
-
 ## analytics-api (Python)
 
 **Status:** **Implemented** (ClickHouse summary + Postgres order detail).
 
 **Responsibility:** OLAP queries, reporting endpoints, Postgres detail reads.
+
+**Why Python:** FastAPI + clickhouse-connect for rapid analytics API development
 
 - Reads: ClickHouse (aggregates), PostgreSQL (order detail)
 - Endpoints: `GET /health`, `GET /ready`, `GET /api/analytics/orders/summary`, `GET /api/analytics/orders/{id}`
@@ -59,6 +62,8 @@ Full reference: [analytics-api service doc](../services/analytics-api).
 **Status:** **Implemented** (consume `order.created` → ClickHouse + Postgres status).
 
 **Responsibility:** Consume `orders.events`, validate payload, write ClickHouse, update order status.
+
+**Why Rust:** Memory-safe, high-throughput consumer; ideal for always-on background processing
 
 - Writes: ClickHouse (`order_events`); PostgreSQL (`orders.status`)
 - Endpoints: `GET /health`, `GET /ready`
@@ -94,4 +99,4 @@ flowchart LR
   Analytics -->|read-only| Postgres
 ```
 
-No service writes to another service's primary datastore directly — all cross-service communication goes through HTTP or the message queue. event-processor is the documented exception: it updates `orders.status` after consuming `order.created`.
+No service writes to another service's primary datastore directly. All cross-service communication goes through HTTP or the message queue. event-processor is the documented exception: it updates `orders.status` after consuming `order.created`.
