@@ -30,7 +30,7 @@ Traefik routes incoming requests to the correct service based on path prefix. It
 
 ## Layer 2: nginx (internal)
 
-An **nginx** instance load-balances across **two replicas** of `catalog-api`. The catalog is read-heavy and cache-friendly — a natural candidate for horizontal scaling.
+An **nginx** instance load-balances across **two replicas** of `catalog-api`. The catalog is read-heavy and cache-friendly, a natural candidate for horizontal scaling.
 
 Config lives in `infra/nginx/catalog-upstream.conf` and `infra/nginx/nginx.conf`.
 

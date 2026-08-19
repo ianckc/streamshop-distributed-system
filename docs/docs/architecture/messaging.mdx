@@ -4,7 +4,7 @@ sidebar_position: 5
 
 # Messaging
 
-StreamShop uses **Redpanda** as its message broker — a Kafka-compatible event streaming platform that runs locally with a fraction of Kafka's resource footprint.
+StreamShop uses **Redpanda** as its message broker. This is a Kafka-compatible event streaming platform that runs locally with a fraction of Kafka's resource footprint.
 
 ## What's running today
 
@@ -39,7 +39,7 @@ docker compose exec redpanda rpk topic consume orders.events --num 1
 
 ## Event schema
 
-order-api publishes this JSON; event-processor validates it with serde (required fields, `event_type`, non-empty `items`):
+[order-api](../services/order-api) publishes this JSON; [event-processor](../services/event-processor) validates it with serde (required fields, `event_type`, non-empty `items`):
 
 ```json
 {

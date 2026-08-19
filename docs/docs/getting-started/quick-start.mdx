@@ -6,8 +6,8 @@ sidebar_position: 1
 
 ## Prerequisites
 
-- Docker Desktop or Docker Engine + Compose v2.20+
-- Node.js 20+ (only if you want to run the docs site locally)
+- Docker Desktop or Docker Engine + Compose v5.4+
+- Node.js 24 (only if you want to run the docs site locally)
 - Python 3 (used by `make smoke` to parse JSON)
 
 ## What works today
@@ -48,7 +48,26 @@ make up && make seed && make smoke
 | `make logs` | Follows Compose logs |
 | `make down` | Stops the stack (volumes kept) |
 
-This starts **Traefik**, **nginx**, **docs-site**, **postgres**, **mongo**, **redis**, **redisinsight**, **minio**, **redpanda**, **redpanda-console**, **clickhouse**, **event-processor**, **analytics-api**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Gateway: **:8080**. Docs: [http://localhost:8080/docs/](http://localhost:8080/docs/). Redis Insight: **:5540**. MinIO console: **:9001**. Redpanda Console: **:8082**. ClickHouse HTTP: **:8123**.
+This starts
+
+- **Traefik**
+- **nginx**
+- **docs-site**
+- **postgres**
+- **mongo**
+- **redis**
+- **redisinsight**
+- **minio**
+- **redpanda**
+- **redpanda-console**
+- **clickhouse**
+- **event-processor**
+- **analytics-api**
+- **order-api**
+- **catalog-api-1**
+- **catalog-api-2**
+
+Gateway: **:8080**. Docs: [http://localhost:8080/docs/](http://localhost:8080/docs/). Redis Insight: **:5540**. MinIO console: **:9001**. Redpanda Console: **:8082**. ClickHouse HTTP: **:8123**.
 
 ### 30-second walkthrough
 
@@ -115,6 +134,7 @@ For live reload while editing content:
 
 ```bash
 cd docs
+nvm use
 npm install
 npm start
 ```
@@ -136,14 +156,3 @@ This adds **otel-collector**, **jaeger**, **prometheus**, and **grafana** alongs
 | Grafana | [http://localhost:3000](http://localhost:3000) | Dashboards (admin/admin) |
 
 Services export telemetry to the OTel Collector via OTLP (`:4317` gRPC, `:4318` HTTP). The collector forwards traces to Jaeger and exposes a Prometheus scrape endpoint. A pre-built "StreamShop Overview" dashboard is provisioned into Grafana.
-
-Per-service OTel SDK instrumentation is a separate step — the containers are ready to receive data once instrumentation is wired in.
-
-## Next steps
-
-- [event-processor](../services/event-processor) — consume path
-- [order-api](../services/order-api) — endpoints and configuration
-- [catalog-api](../services/catalog-api) — health, list, and detail
-- [Order placement flow](../data-flows/order-placement) — what's built vs planned
-- [Architecture overview](../architecture/overview)
-- [Local development](../development/local-setup)

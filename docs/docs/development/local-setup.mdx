@@ -114,9 +114,10 @@ S3_ACCESS_KEY=streamshop
 S3_SECRET_KEY=streamshop
 S3_BUCKET=product-images
 S3_REGION=us-east-1
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 ```
 
-Copy from `services/catalog-api/.env.example`. `MONGODB_URI`, `REDIS_URL`, and `S3_ENDPOINT` / keys / bucket are **required**.
+Copy from `services/catalog-api/.env.example`. `MONGODB_URI`, `REDIS_URL`, and `S3_ENDPOINT` / keys / bucket are **required**. `OTEL_EXPORTER_OTLP_ENDPOINT` is used when the [observability](../architecture/observability) profile is running; otherwise the SDK fails open.
 
 ## Other services
 

@@ -4,14 +4,16 @@ sidebar_position: 2
 
 # API Gateway
 
-StreamShop uses **Traefik v3** as the edge API gateway — the HTTP entrypoint for path-based routing.
+StreamShop uses **Traefik v3** as the edge API gateway, the HTTP entrypoint for path-based routing.
 
 ## What's running today
 
-- HTTP entrypoint: `localhost:8080`
-- Dashboard: `localhost:8081` (`--api.insecure` for local use)
-- Routed: `PathPrefix(/api/orders)` → order-api, `PathPrefix(/api/catalog)` → nginx (then 2× catalog-api), `PathPrefix(/api/analytics)` → analytics-api
+- Image: `traefik:v3.6`
+- HTTP entrypoint `web`: host `localhost:8080` → container `:80`
+- Dashboard: `localhost:8081` (`--api.insecure`; not behind a Compose profile)
+- Routed: `PathPrefix(/api/orders)` → order-api, `PathPrefix(/api/catalog)` → nginx (then 2× catalog-api), `PathPrefix(/api/analytics)` → analytics-api, `PathPrefix(/docs)` → docs-site
 - Direct access: catalog replicas on `:3001` / `:3011`, order-api on `:3002`, analytics-api on `:3003`, event-processor on `:3004` (not behind Traefik)
+- Not configured: TLS (`:8443`), rate limiting, request size limits, `X-Request-Id`
 
 ```yaml
 labels:
@@ -21,16 +23,14 @@ labels:
   - traefik.http.services.order-api.loadbalancer.server.port=3002
 ```
 
-Analytics routing is wired. TLS and rate limiting are not yet.
-
 ## Responsibilities
 
-| Concern | Implementation |
-|---------|----------------|
-| Routing | Path-based: `/api/catalog/*`, `/api/orders/*`, `/api/analytics/*` |
-| TLS | Optional termination on `:8443` |
-| Middleware | Rate limiting, request size limits |
-| Dashboard | Traefik UI on `:8081` (dev profile) |
+| Concern | Today |
+|---------|-------|
+| Routing | Path-based: `/api/catalog/*`, `/api/orders/*`, `/api/analytics/*`, `/docs/*` |
+| TLS | Not configured |
+| Middleware | None (no rate limiting or request size limits) |
+| Dashboard | Traefik UI on `:8081` |
 
 ## Why Traefik
 
@@ -55,11 +55,8 @@ sequenceDiagram
   participant Traefik
   participant Service
 
-  Client->>Traefik: GET /api/orders/123
-  Traefik->>Traefik: Rate limit check
+  Client->>Traefik: GET /api/catalog/products
   Traefik->>Service: Forward request
   Service-->>Traefik: 200 JSON
   Traefik-->>Client: 200 JSON
 ```
-
-All services receive a `X-Request-Id` header for correlation across logs and traces.
