@@ -29,7 +29,7 @@ Go HTTP service for creating orders and persisting them to PostgreSQL.
 | Database | PostgreSQL 18 via `pgx` |
 | Events | Redpanda via kafka-go |
 | Catalog | HTTP client (`CATALOG_API_URL`) |
-| Redis | go-redis (connect/ping when `REDIS_URL` is set; keys not used yet) |
+| Redis | go-redis (connect/ping when `REDIS_URL` is set). Idempotency helper is implemented; `POST /api/orders` does not use it yet. |
 | Observability | OpenTelemetry SDK (OTLP gRPC) |
 | Port | `3002` (default) |
 
@@ -185,7 +185,7 @@ go test -coverprofile=coverage.out -coverpkg=./... ./...
 go tool cover -html=coverage.out -o coverage.html
 ```
 
-Handler tests use a fake store and publisher — no database or Redpanda required. Postgres store tests are not yet added. `GetOrder` is implemented for later idempotency replay; `POST /api/orders` does not call it yet.
+Handler tests use a fake store and publisher — no database or Redpanda required. Postgres store tests are not yet added. `GetOrder` and the Redis idempotency helper (`SET NX EX 3600`, pending vs complete) are implemented; `POST /api/orders` does not call them yet.
 
 ## Project layout
 
@@ -195,6 +195,7 @@ internal/catalog/           Catalog HTTP client
 internal/config/            Environment config
 internal/events/            order.created payload and Kafka publisher
 internal/handler/           HTTP handlers
+internal/idempotency/       Redis SET NX helper (not wired to POST yet)
 internal/model/             Domain types
 internal/redisclient/       Redis connect and ping
 internal/store/             Store interface
