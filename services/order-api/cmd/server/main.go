@@ -14,6 +14,7 @@ import (
 	"github.com/ianckc/distributed-systems/services/order-api/internal/config"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/events"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/handler"
+	"github.com/ianckc/distributed-systems/services/order-api/internal/redisclient"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/store/postgres"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/telemetry"
 )
@@ -52,6 +53,22 @@ func main() {
 		os.Exit(1)
 	}
 	defer pool.Close()
+
+	if cfg.RedisURL != "" {
+		redisCtx, redisCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		redisClient, err := redisclient.Connect(redisCtx, cfg.RedisURL)
+		redisCancel()
+		if err != nil {
+			slog.Error("failed to connect to redis", "error", err)
+			os.Exit(1)
+		}
+		defer func() {
+			if err := redisClient.Close(); err != nil {
+				slog.Error("failed to close redis", "error", err)
+			}
+		}()
+		slog.Info("redis connected")
+	}
 
 	orderStore := postgres.NewOrderStore(pool)
 	publisher := events.NewKafkaPublisher(cfg.KafkaBrokers)

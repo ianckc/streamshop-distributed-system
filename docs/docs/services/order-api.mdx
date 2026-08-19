@@ -29,6 +29,7 @@ Go HTTP service for creating orders and persisting them to PostgreSQL.
 | Database | PostgreSQL 18 via `pgx` |
 | Events | Redpanda via kafka-go |
 | Catalog | HTTP client (`CATALOG_API_URL`) |
+| Redis | go-redis (connect/ping when `REDIS_URL` is set; keys not used yet) |
 | Observability | OpenTelemetry SDK (OTLP gRPC) |
 | Port | `3002` (default) |
 
@@ -151,9 +152,10 @@ docker compose exec postgres \
 | `DATABASE_URL` | *(required)* | Postgres connection string |
 | `KAFKA_BROKERS` | *(required)* | Kafka bootstrap (Compose: `redpanda:9092`; host: `localhost:19092`) |
 | `CATALOG_API_URL` | *(empty)* | Catalog base URL; empty disables product validation. Compose: `http://nginx`; host: `http://localhost:8080` |
+| `REDIS_URL` | *(empty)* | Redis connection string. Empty skips Redis. Set in Compose (`redis://redis:6379`). Invalid URL or ping failure → process exits. Idempotency keys are not used yet. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | *(SDK default)* | OTLP gRPC endpoint. Compose: `http://otel-collector:4317`. Collector down → service still starts |
 
-Compose also reads root `.env` for `ORDER_API_PORT`, `ORDER_API_SERVICE_NAME`, `DATABASE_URL`, `KAFKA_BROKERS`, `CATALOG_API_URL`, and `OTEL_EXPORTER_OTLP_ENDPOINT`.
+Compose also reads root `.env` for `ORDER_API_PORT`, `ORDER_API_SERVICE_NAME`, `DATABASE_URL`, `KAFKA_BROKERS`, `CATALOG_API_URL`, `REDIS_URL`, and `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
 Example `DATABASE_URL` for local Postgres:
 
@@ -166,12 +168,12 @@ Inside Compose, the hostname is `postgres` instead of `localhost`.
 ## Local development (without running the app in Docker)
 
 ```bash
-docker compose up -d postgres redpanda traefik nginx
+docker compose up -d postgres redis redpanda traefik nginx
 cp .env.example .env
 go run ./cmd/server
 ```
 
-`DATABASE_URL` in `.env.example` points at `localhost:5432`. `KAFKA_BROKERS` points at `localhost:19092`. `CATALOG_API_URL` points at `http://localhost:8080`. Inside Compose the hostnames are `postgres`, `redpanda`, and `nginx`.
+`DATABASE_URL` in `.env.example` points at `localhost:5432`. `KAFKA_BROKERS` points at `localhost:19092`. `CATALOG_API_URL` points at `http://localhost:8080`. `REDIS_URL` points at `localhost:6379`. Inside Compose the hostnames are `postgres`, `redpanda`, `nginx`, and `redis`.
 
 Tracing and metrics export to `OTEL_EXPORTER_OTLP_ENDPOINT` when the [observability](../architecture/observability) Compose profile is running; otherwise OpenTelemetry init fails open.
 
@@ -194,6 +196,7 @@ internal/config/            Environment config
 internal/events/            order.created payload and Kafka publisher
 internal/handler/           HTTP handlers
 internal/model/             Domain types
+internal/redisclient/       Redis connect and ping
 internal/store/             Store interface
 internal/store/postgres/    Postgres implementation
 internal/telemetry/         OpenTelemetry init and HTTP middleware

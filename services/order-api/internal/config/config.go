@@ -11,6 +11,7 @@ type Config struct {
 	DatabaseURL   string
 	KafkaBrokers  string
 	CatalogAPIURL string
+	RedisURL      string
 }
 
 func Load() (Config, error) {
@@ -40,6 +41,7 @@ func Load() (Config, error) {
 		DatabaseURL:   databaseURL,
 		KafkaBrokers:  kafkaBrokers,
 		CatalogAPIURL: os.Getenv("CATALOG_API_URL"),
+		RedisURL:      os.Getenv("REDIS_URL"),
 	}, nil
 }
 
