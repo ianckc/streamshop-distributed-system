@@ -17,7 +17,8 @@ Rust consumer for `order.created` events. It writes a denormalized fact to Click
 | Postgres status → `processed` | Implemented |
 | Invalid payload → `orders.events.dlq` | Implemented |
 | Analytics HTTP API | Implemented ([analytics-api](../services/analytics-api)) |
-| OpenTelemetry / metrics | Planned |
+| OpenTelemetry traces | Implemented (OTLP gRPC; Kafka `traceparent`; fail-open) |
+| Prometheus `/metrics` | Planned |
 
 ## Stack
 
@@ -28,6 +29,7 @@ Rust consumer for `order.created` events. It writes a denormalized fact to Click
 | Kafka | rust-rdkafka (`cmake-build`) |
 | OLAP | ClickHouse 24 (HTTP `:8123`) |
 | OLTP | PostgreSQL 18 via `tokio-postgres` |
+| Observability | OpenTelemetry SDK (OTLP gRPC; `tracing` spans) |
 | Port | `3004` (not behind Traefik) |
 
 ## Run with Docker Compose
@@ -109,6 +111,9 @@ Redpanda Console: [http://localhost:8082](http://localhost:8082) — consumer gr
 | `CLICKHOUSE_USER` | `streamshop` | ClickHouse user |
 | `CLICKHOUSE_PASSWORD` | `streamshop` | ClickHouse password |
 | `CLICKHOUSE_DATABASE` | `streamshop` | Database with `order_events` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | *(unset)* | OTLP gRPC endpoint. Compose: `http://otel-collector:4317`. Unset or empty → JSON logs only; service still starts |
+
+Compose also reads root `.env` for `EVENT_PROCESSOR_PORT`, `EVENT_PROCESSOR_SERVICE_NAME`, `KAFKA_*`, `DATABASE_URL`, `CLICKHOUSE_*`, and `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
 ## Local development (without running the app in Docker)
 
@@ -119,7 +124,7 @@ cd services/event-processor
 cargo test
 ```
 
-`cargo test --features kafka` builds the rdkafka client (requires cmake).
+`cargo test --features kafka` builds the rdkafka client (requires cmake). Tracing exports to `OTEL_EXPORTER_OTLP_ENDPOINT` when the [observability](../architecture/observability) Compose profile is running; otherwise OpenTelemetry init fails open. Kafka consume spans continue parent context from W3C `traceparent` headers.
 
 ## Tests
 
@@ -142,4 +147,5 @@ src/analytics.rs  ClickHouse client
 src/orders.rs     Postgres status update
 src/http.rs       /health and /ready
 src/consume.rs    rdkafka (feature kafka)
+src/telemetry.rs  Kafka W3C trace context (feature kafka)
 ```
