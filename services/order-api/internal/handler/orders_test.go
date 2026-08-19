@@ -14,15 +14,24 @@ import (
 	"github.com/ianckc/distributed-systems/services/order-api/internal/events"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/handler"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/model"
+	"github.com/ianckc/distributed-systems/services/order-api/internal/store"
 )
 
 type fakeOrderStore struct {
 	createFn func(ctx context.Context, order model.Order) (model.Order, error)
+	getFn    func(ctx context.Context, id uuid.UUID) (model.Order, error)
 	pingFn   func(ctx context.Context) error
 }
 
 func (f fakeOrderStore) CreateOrder(ctx context.Context, order model.Order) (model.Order, error) {
 	return f.createFn(ctx, order)
+}
+
+func (f fakeOrderStore) GetOrder(ctx context.Context, id uuid.UUID) (model.Order, error) {
+	if f.getFn != nil {
+		return f.getFn(ctx, id)
+	}
+	return model.Order{}, store.ErrNotFound
 }
 
 func (f fakeOrderStore) Ping(ctx context.Context) error {
