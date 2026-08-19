@@ -58,7 +58,7 @@ Document store for the product catalog. Products have variable attributes — co
 
 **Accessed by:** `catalog-api` (reads list and detail today; writes planned)
 
-Seed documents live in `infra/mongo/seed.js` and load on first start of an empty volume.
+Seed documents live in `infra/mongo/seed.js` (first start of an empty volume) and are upserted again by `make seed`.
 
 ## Redis (Cache)
 

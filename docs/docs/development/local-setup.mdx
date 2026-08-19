@@ -17,10 +17,10 @@ sidebar_position: 1
 
 ### With Docker Compose
 
-From the repo root — starts Traefik, nginx, Postgres, Mongo, Redis, Redis Insight, MinIO, Redpanda, Redpanda Console, ClickHouse, event-processor, analytics-api, order-api, and two catalog-api replicas:
+From the repo root — starts Traefik, nginx, Postgres, Mongo, Redis, Redis Insight, MinIO, Redpanda, Redpanda Console, ClickHouse, event-processor, analytics-api, order-api, two catalog-api replicas, and docs-site:
 
 ```bash
-docker compose up --build
+make up && make seed && make smoke
 ```
 
 ### App locally, Postgres in Docker
@@ -49,7 +49,7 @@ See [order-api](../services/order-api) for endpoints and configuration.
 
 ### With Docker Compose
 
-Included in `docker compose up --build`. Replica 1: `http://localhost:3001/health`. Replica 2: `http://localhost:3011/health`. Products via Traefik → nginx: `http://localhost:8080/api/catalog/products`.
+Included in `make up`. Replica 1: `http://localhost:3001/health`. Replica 2: `http://localhost:3011/health`. Products via Traefik → nginx: `http://localhost:8080/api/catalog/products`.
 
 ### App locally, Mongo and Redis in Docker
 
@@ -76,7 +76,7 @@ See [catalog-api](../services/catalog-api) for endpoints and configuration.
 
 ## event-processor (implemented)
 
-Included in `docker compose up --build`. Health/ready: `http://localhost:3004/health` and `http://localhost:3004/ready`.
+Included in `make up`. Health/ready: `http://localhost:3004/health` and `http://localhost:3004/ready`.
 
 Unit tests do not need cmake, Kafka, or ClickHouse:
 
@@ -134,7 +134,7 @@ cd services/analytics-api && pip install ".[dev]" && python -m analytics_api.mai
 
 ## Docs site
 
-With Compose (included in `docker compose up --build`):
+With Compose (included in `make up`):
 
 [http://localhost:8080/docs/](http://localhost:8080/docs/)
 

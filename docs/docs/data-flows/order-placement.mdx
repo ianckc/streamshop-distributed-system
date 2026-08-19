@@ -34,6 +34,14 @@ sequenceDiagram
 
 ### Try it
 
+With the stack up (`make up && make seed`):
+
+```bash
+make smoke
+```
+
+Or place an order by hand:
+
 ```bash
 curl -s -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' \

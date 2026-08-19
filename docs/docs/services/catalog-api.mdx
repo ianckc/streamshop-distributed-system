@@ -36,11 +36,10 @@ Node.js HTTP service for the product catalog.
 From the repository root:
 
 ```bash
-cp .env.example .env   # optional
-docker compose up --build
+make up && make seed
 ```
 
-Starts **Traefik**, **nginx**, **mongo**, **redis**, **redisinsight**, **minio**, **redpanda**, **redpanda-console**, **clickhouse**, **event-processor**, **postgres**, **order-api**, **catalog-api-1**, and **catalog-api-2**. Health/ready: `http://localhost:3001/health` (replica 1) and `http://localhost:3011/health` (replica 2). Products via Traefik → nginx: `http://localhost:8080/api/catalog/products`.
+Starts the full stack (same as `docker compose up --build -d --wait`). Health/ready: `http://localhost:3001/health` (replica 1) and `http://localhost:3011/health` (replica 2). Products via Traefik → nginx: `http://localhost:8080/api/catalog/products`.
 
 ## Endpoints
 
@@ -127,7 +126,7 @@ curl http://localhost:8080/api/catalog/products/prod-001
 docker compose exec mongo mongosh streamshop --eval 'db.products.find().pretty()'
 ```
 
-Seed data is loaded from `infra/mongo/seed.js` on first start of an empty volume. Reset with `docker compose down -v`.
+Seed data is loaded from `infra/mongo/seed.js` on first start of an empty volume. `make seed` upserts the same products and uploads sample images if the volume already exists. Full reset: `docker compose down -v` then `make up && make seed`.
 
 ### Inspect Redis
 
