@@ -108,14 +108,14 @@ flowchart TB
   Prometheus --> Grafana
 ```
 
-## Orchestration (target)
+## Orchestration
 
-Docker Compose with optional profiles:
+Docker Compose from the repo root. Default `make up` starts the application stack with no extra profiles. Observability is opt-in.
 
-- **`minimal`** — gateway, core services, Postgres, Redis *(not yet defined)*
-- **`full`** — all databases, Redpanda, MinIO, observability *(not yet defined)*
+- **Default** (`make up`) — Traefik, nginx, postgres, mongo, redis, redisinsight, minio, redpanda, redpanda-console, clickhouse, event-processor, analytics-api, order-api, catalog-api-1, catalog-api-2, and docs-site. Then `make seed` and `make smoke`.
+- **`observability`** — OTel Collector, Jaeger (`:16686`), Prometheus (`:9090`), Grafana (`:3000`). Start with `docker compose --profile observability up --build`.
 
-Today: `make up` (Compose without extra profiles) runs Traefik, nginx, postgres, mongo, redis, redisinsight, minio, redpanda, redpanda-console, clickhouse, event-processor, analytics-api, order-api, catalog-api-1, catalog-api-2, and docs-site. Then `make seed` and `make smoke`.
+`minimal` and `full` profiles from the original plan are not defined.
 
 ## Service responsibilities (target)
 
@@ -144,14 +144,14 @@ Today: `make up` (Compose without extra profiles) runs Traefik, nginx, postgres,
 | NoSQL | MongoDB 8 | [Storage](./storage) | **Built** |
 | OLAP | ClickHouse 24 | [Storage](./storage) | **Built** (`order_events` writes) |
 | Object storage | MinIO | [Storage](./storage) | **Built** (presigned GET on catalog reads) |
-| Observability | OTel, Jaeger, Prometheus, Grafana | [Observability](./observability) | Planned |
+| Observability | OTel, Jaeger, Prometheus, Grafana | [Observability](./observability) | **Built** (`--profile observability`) |
 
-## User journeys (target)
+## User journeys
 
-1. **Browse catalog** — cached product list behind nginx (2 replicas)
-2. **Upload product image** — MinIO via catalog-api
-3. **Place order** — Go service writes to Postgres, publishes `order.created`
-4. **Async processing** — Rust consumer → ClickHouse + `processed`; analytics-api reads aggregates and order detail *(built)*
-5. **Analytics** — Python queries ClickHouse + Postgres
+1. **Browse catalog** cached product list/detail behind nginx (2 replicas) *(built)*
+2. **Upload product image** MinIO via catalog-api *(planned; `make seed` uploads samples; catalog reads return presigned `image_url`)*
+3. **Place order** Go service writes to Postgres, publishes `order.created` *(built)*
+4. **Async processing** Rust consumer → ClickHouse + `processed` *(built)*
+5. **Analytics** Python queries ClickHouse + Postgres *(built)*
 
 See [Order Placement](../data-flows/order-placement) for the full flow and what's implemented.
