@@ -18,7 +18,7 @@ Go HTTP service for creating orders and persisting them to PostgreSQL.
 | Redpanda event publishing | Implemented (`order.created` → `orders.events`; fail-open) |
 | Catalog product validation | Implemented (when `CATALOG_API_URL` is set) |
 | OpenTelemetry traces and metrics | Implemented (OTLP gRPC; fail-open) |
-| Redis idempotency keys | Planned |
+| Redis idempotency keys | Handler implemented; Redis not attached in `cmd/server` yet |
 
 ## Stack
 
@@ -29,7 +29,7 @@ Go HTTP service for creating orders and persisting them to PostgreSQL.
 | Database | PostgreSQL 18 via `pgx` |
 | Events | Redpanda via kafka-go |
 | Catalog | HTTP client (`CATALOG_API_URL`) |
-| Redis | go-redis (connect/ping when `REDIS_URL` is set). Idempotency helper is implemented; `POST /api/orders` does not use it yet. |
+| Redis | go-redis (connect/ping when `REDIS_URL` is set). Handler supports `Idempotency-Key`; the server does not attach the Redis store yet. |
 | Observability | OpenTelemetry SDK (OTLP gRPC) |
 | Port | `3002` (default) |
 
@@ -111,6 +111,8 @@ Create an order. Amounts are in **pence** (GBP minor units).
 
 When `CATALOG_API_URL` is set (Compose default `http://nginx`), each item is looked up on [catalog-api](./catalog-api); unknown products or a `price_pence` that does not match the catalog return `400`. Catalog unreachable → `503` `{"error":"catalog unavailable"}`. If `CATALOG_API_URL` is empty, validation is skipped.
 
+Optional header `Idempotency-Key`: the handler reserves the key before insert (`SET NX`). First success → `201` and stores the `order_id`. Replay → `200` with the original order (no second insert, no second Kafka publish). In-flight duplicate → `409`. Redis error, or a key sent when Redis is not attached to the handler → `503` `{"error":"idempotency unavailable"}`. No header → current behaviour (new order every time). Catalog and JSON validation run **before** the Redis reservation so a `400` does not leave a pending key.
+
 `total_pence` is computed server-side (`qty × price_pence` per item). After the Postgres commit, `order.created` is published to Redpanda topic `orders.events` (auto-created on first produce). If Redpanda is down, the order is still saved and `201` is returned (fail-open; error logged). `/ready` still pings Postgres only. The `201` body shows `status: "pending"`; [event-processor](./event-processor) later sets it to `processed`.
 
 Inspect the event in Redpanda Console: [http://localhost:8082](http://localhost:8082) (topic `orders.events`).
@@ -124,7 +126,8 @@ docker compose exec redpanda rpk topic consume orders.events --num 1
 | Status | When |
 |--------|------|
 | `400` | Invalid JSON, validation failure, unknown product, or price mismatch |
-| `503` | Database error or catalog unavailable |
+| `409` | `Idempotency-Key` is already in progress |
+| `503` | Database error, catalog unavailable, or idempotency unavailable |
 
 ```bash
 curl -s -X POST http://localhost:8080/api/orders \
@@ -185,7 +188,7 @@ go test -coverprofile=coverage.out -coverpkg=./... ./...
 go tool cover -html=coverage.out -o coverage.html
 ```
 
-Handler tests use a fake store and publisher — no database or Redpanda required. Postgres store tests are not yet added. `GetOrder` and the Redis idempotency helper (`SET NX EX 3600`, pending vs complete) are implemented; `POST /api/orders` does not call them yet.
+Handler tests use a fake store, publisher, and idempotency store — no database, Redis, or Redpanda required. Postgres store tests are not yet added. The create handler implements `Idempotency-Key`; `cmd/server` does not pass a Redis-backed store yet.
 
 ## Project layout
 
@@ -195,7 +198,7 @@ internal/catalog/           Catalog HTTP client
 internal/config/            Environment config
 internal/events/            order.created payload and Kafka publisher
 internal/handler/           HTTP handlers
-internal/idempotency/       Redis SET NX helper (not wired to POST yet)
+internal/idempotency/       Redis SET NX helper
 internal/model/             Domain types
 internal/redisclient/       Redis connect and ping
 internal/store/             Store interface
