@@ -34,13 +34,13 @@ flowchart LR
 - **Traefik** on `:8080` — `/api/orders` → order-api, `/api/catalog` → nginx → catalog replicas, `/api/analytics` → analytics-api, `/docs/` → docs-site; dashboard on `:8081`
 - **nginx** — round_robin across `catalog-api-1` and `catalog-api-2`
 - **catalog-api** — replica 1 on `:3001`, replica 2 on `:3011` (`GET /health`, `GET /ready`, product list/detail)
-- **order-api** on `:3002` — `GET /health`, `GET /ready`, `POST /api/orders` (Postgres write then `order.created`)
-- **PostgreSQL** — `orders` and `order_items` tables
+- **order-api** on `:3002` — `GET /health`, `GET /ready`, `POST /api/orders` (Postgres + outbox; poller publishes `order.created`)
+- **PostgreSQL** — `orders`, `order_items`, and `outbox` tables
 - **MongoDB** — `products` collection
 - **Redis** — catalog cache-aside (TTL 60s; fail-open) and order-api `Idempotency-Key` (fail-closed when the header is present)
 - **Redis Insight** on `:5540` — local GUI; not behind Traefik
 - **MinIO** — S3 API `:9000`, console `:9001`; buckets `product-images` and `exports`; catalog-api returns presigned `image_url` on product reads (upload via API is planned)
-- **Redpanda** v26.2.1 — Kafka API `:19092` (host), `redpanda:9092` (Compose); `orders.events` from order-api
+- **Redpanda** v26.2.1 — Kafka API `:19092` (host), `redpanda:9092` (Compose); `orders.events` from order-api outbox poller
 - **Redpanda Console** on `:8082` — local GUI for topics and messages; not behind Traefik
 - **event-processor** on `:3004` — consumes `order.created`, writes ClickHouse, marks orders `processed`
 - **ClickHouse** HTTP `:8123` — `order_events` (native port not published; MinIO uses `:9000`)
@@ -128,7 +128,7 @@ Docker Compose from the repo root. Default `make up` starts the application stac
 
 **catalog-api today:** two replicas behind nginx; `GET /health`, `GET /ready` (Mongo ping), `GET /api/catalog/products`, and `GET /api/catalog/products/:id` with Redis cache-aside and MinIO presigned `image_url`; upload via the API is not wired yet.
 
-**order-api today:** writes to PostgreSQL then publishes `order.created` to `orders.events` (fail-open); optional `Idempotency-Key` via Redis; exposes `GET /health`, `GET /ready` (Postgres ping), and `POST /api/orders`.
+**order-api today:** writes orders and outbox rows in one Postgres transaction; an in-process poller publishes `order.created` to `orders.events`; optional `Idempotency-Key` via Redis; exposes `GET /health`, `GET /ready` (Postgres ping), and `POST /api/orders`.
 
 **event-processor today:** consumes `orders.events`, inserts ClickHouse `order_events`, sets Postgres `orders.status = processed`, then commits the offset. Invalid payloads go to `orders.events.dlq`.
 
@@ -150,7 +150,7 @@ Docker Compose from the repo root. Default `make up` starts the application stac
 
 1. **Browse catalog** cached product list/detail behind nginx (2 replicas) *(built)*
 2. **Upload product image** MinIO via catalog-api *(planned; `make seed` uploads samples; catalog reads return presigned `image_url`)*
-3. **Place order** Go service writes to Postgres, publishes `order.created` *(built)*
+3. **Place order** Go service writes to Postgres (outbox), poller publishes `order.created` *(built)*
 4. **Async processing** Rust consumer → ClickHouse + `processed` *(built)*
 5. **Analytics** Python queries ClickHouse + Postgres *(built)*
 

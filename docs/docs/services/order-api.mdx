@@ -14,8 +14,8 @@ Go HTTP service for creating orders and persisting them to PostgreSQL.
 | `GET /ready` | Implemented |
 | `POST /api/orders` | Implemented |
 | Traefik route (`/api/orders` on `:8080`) | Implemented |
-| Postgres persistence (`orders`, `order_items`) | Implemented |
-| Redpanda event publishing | Implemented (`order.created` → `orders.events`; fail-open) |
+| Postgres persistence (`orders`, `order_items`, `outbox`) | Implemented |
+| Redpanda event publishing | Implemented (transactional outbox + in-process poller → `orders.events`) |
 | Catalog product validation | Implemented (when `CATALOG_API_URL` is set) |
 | OpenTelemetry traces and metrics | Implemented (OTLP gRPC; fail-open) |
 | Redis idempotency keys | Implemented (when `REDIS_URL` is set) |
@@ -111,9 +111,11 @@ Create an order. Amounts are in **pence** (GBP minor units).
 
 When `CATALOG_API_URL` is set (Compose default `http://nginx`), each item is looked up on [catalog-api](./catalog-api); unknown products or a `price_pence` that does not match the catalog return `400`. Catalog unreachable → `503` `{"error":"catalog unavailable"}`. If `CATALOG_API_URL` is empty, validation is skipped.
 
-Optional header `Idempotency-Key`: when `REDIS_URL` is set, the handler reserves the key before insert (`SET NX`). First success → `201` and stores the `order_id`. Replay → `200` with the original order (no second insert, no second Kafka publish). In-flight duplicate → `409`. Redis error, or a key sent when `REDIS_URL` is empty → `503` `{"error":"idempotency unavailable"}`. No header → current behaviour (new order every time). Catalog and JSON validation run **before** the Redis reservation so a `400` does not leave a pending key.
+Optional header `Idempotency-Key`: when `REDIS_URL` is set, the handler reserves the key before insert (`SET NX`). First success → `201` and stores the `order_id`. Replay → `200` with the original order (no second insert, no second outbox row). In-flight duplicate → `409`. Redis error, or a key sent when `REDIS_URL` is empty → `503` `{"error":"idempotency unavailable"}`. No header → current behaviour (new order every time). Catalog and JSON validation run **before** the Redis reservation so a `400` does not leave a pending key.
 
-`total_pence` is computed server-side (`qty × price_pence` per item). After the Postgres commit, `order.created` is published to Redpanda topic `orders.events` (auto-created on first produce). If Redpanda is down, the order is still saved and `201` is returned (fail-open; error logged). `/ready` still pings Postgres only. The `201` body shows `status: "pending"`; [event-processor](./event-processor) later sets it to `processed`.
+`total_pence` is computed server-side (`qty × price_pence` per item). The handler inserts `orders`, `order_items`, and an `outbox` row in **one Postgres transaction**, then returns `201`. It does **not** call Kafka. An in-process **outbox poller** (~300 ms) claims unpublished rows, publishes `order.created` to `orders.events`, and sets `published_at`. If Redpanda is down, the order and outbox row are still saved; events publish after recovery. `/ready` pings Postgres only. The `201` body shows `status: "pending"`; [event-processor](./event-processor) later sets it to `processed`.
+
+At scale the poller would run as a **separate worker**; here it is in-process for simplicity.
 
 Inspect the event in Redpanda Console: [http://localhost:8082](http://localhost:8082) (topic `orders.events`).
 
@@ -151,6 +153,23 @@ docker compose exec redis redis-cli GET 'idempotency:demo-001'
 docker compose exec postgres \
   psql -U streamshop -d streamshop \
   -c 'SELECT id, user_id, status, total_pence FROM orders;'
+
+docker compose exec postgres \
+  psql -U streamshop -d streamshop \
+  -c 'SELECT id, topic, message_key, published_at FROM outbox ORDER BY id DESC LIMIT 5;'
+```
+
+### Outbox demo (broker down)
+
+```bash
+docker compose stop redpanda
+curl -s -X POST http://localhost:8080/api/orders \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":"660e8400-e29b-41d4-a716-446655440001","items":[{"product_id":"prod-001","qty":2,"price_pence":1999}]}'
+docker compose exec postgres psql -U streamshop -d streamshop \
+  -c 'SELECT id, topic, published_at FROM outbox ORDER BY id DESC LIMIT 1;'
+docker compose start redpanda
+# published_at fills in; event-processor processes
 ```
 
 ## Configuration
@@ -195,7 +214,7 @@ go test -coverprofile=coverage.out -coverpkg=./... ./...
 go tool cover -html=coverage.out -o coverage.html
 ```
 
-Handler tests use a fake store, publisher, and idempotency store — no database, Redis, or Redpanda required. Postgres store tests are not yet added. With `REDIS_URL` set, `cmd/server` attaches the Redis-backed idempotency store.
+Handler tests use a fake store and idempotency store — no database, Redis, or Redpanda required. Outbox poller logic has unit tests; optional integration test: `go test -tags=integration ./internal/outbox/...` (needs local Postgres + Redpanda). With `REDIS_URL` set, `cmd/server` attaches the Redis-backed idempotency store and starts the outbox poller.
 
 ## Project layout
 
@@ -207,6 +226,7 @@ internal/events/            order.created payload and Kafka publisher
 internal/handler/           HTTP handlers
 internal/idempotency/       Redis SET NX helper
 internal/model/             Domain types
+internal/outbox/            Outbox store, poller, publish/mark logic
 internal/redisclient/       Redis connect and ping
 internal/store/             Store interface
 internal/store/postgres/    Postgres implementation
@@ -215,9 +235,10 @@ internal/telemetry/         OpenTelemetry init and HTTP middleware
 
 ## Database schema
 
-Defined in `infra/postgres/init.sql`:
+Defined in `infra/postgres/init.sql` (fresh volumes). Apply `infra/postgres/outbox.sql` on existing volumes — see [Reset Data](../runbooks/reset-data).
 
 - **`orders`** — `id`, `user_id`, `status`, `total_pence`, `created_at`
 - **`order_items`** — `order_id`, `product_id`, `qty`, `price_pence`
+- **`outbox`** — `topic`, `message_key`, `payload` (JSONB), `created_at`, `published_at`
 
-Orders are inserted in a single transaction (order row + all line items).
+Orders and the matching outbox row are inserted in a single transaction (order row + all line items + one outbox event).

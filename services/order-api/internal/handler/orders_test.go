@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/ianckc/distributed-systems/services/order-api/internal/events"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/handler"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/idempotency"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/model"
@@ -40,18 +39,6 @@ func (f fakeOrderStore) Ping(ctx context.Context) error {
 		return f.pingFn(ctx)
 	}
 	return nil
-}
-
-type recordingPublisher struct {
-	orders []model.Order
-	err    error
-	called bool
-}
-
-func (p *recordingPublisher) PublishOrderCreated(_ context.Context, order model.Order) error {
-	p.called = true
-	p.orders = append(p.orders, order)
-	return p.err
 }
 
 type fakeIdempotency struct {
@@ -168,50 +155,7 @@ func TestOrderHandlerCreate(t *testing.T) {
 		}
 	})
 
-	t.Run("publishes order.created after persist", func(t *testing.T) {
-		pub := &recordingPublisher{}
-		createdAt := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
-		h := handler.OrderHandler{
-			Store: fakeOrderStore{
-				createFn: func(_ context.Context, order model.Order) (model.Order, error) {
-					order.CreatedAt = createdAt
-					return order, nil
-				},
-			},
-			Events: pub,
-		}
-
-		body := `{
-			"user_id": "660e8400-e29b-41d4-a716-446655440001",
-			"items": [{"product_id": "prod-001", "qty": 2, "price_pence": 1999}]
-		}`
-		req := httptest.NewRequest(http.MethodPost, "/api/orders", bytes.NewBufferString(body))
-		rec := httptest.NewRecorder()
-
-		h.Create(rec, req)
-
-		if rec.Code != http.StatusCreated {
-			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusCreated, rec.Body.String())
-		}
-		if !pub.called {
-			t.Fatal("expected publish")
-		}
-		if len(pub.orders) != 1 {
-			t.Fatalf("published %d events, want 1", len(pub.orders))
-		}
-		got := events.NewOrderCreated(pub.orders[0])
-		if got.EventType != events.EventTypeOrderCreated {
-			t.Fatalf("event_type = %q", got.EventType)
-		}
-		if got.TotalPence != 3998 {
-			t.Fatalf("total_pence = %d", got.TotalPence)
-		}
-		if got.UserID != userID.String() {
-			t.Fatalf("user_id = %q", got.UserID)
-		}
-	})
-
-	t.Run("returns 201 when publish fails", func(t *testing.T) {
+	t.Run("returns 201 after persist without publishing", func(t *testing.T) {
 		h := handler.OrderHandler{
 			Store: fakeOrderStore{
 				createFn: func(_ context.Context, order model.Order) (model.Order, error) {
@@ -219,7 +163,6 @@ func TestOrderHandlerCreate(t *testing.T) {
 					return order, nil
 				},
 			},
-			Events: &recordingPublisher{err: errors.New("redpanda down")},
 		}
 
 		body := `{
@@ -236,33 +179,6 @@ func TestOrderHandlerCreate(t *testing.T) {
 		}
 	})
 
-	t.Run("does not publish when store fails", func(t *testing.T) {
-		pub := &recordingPublisher{}
-		h := handler.OrderHandler{
-			Store: fakeOrderStore{
-				createFn: func(context.Context, model.Order) (model.Order, error) {
-					return model.Order{}, errors.New("db down")
-				},
-			},
-			Events: pub,
-		}
-
-		body := `{
-			"user_id": "660e8400-e29b-41d4-a716-446655440001",
-			"items": [{"product_id": "prod-001", "qty": 1, "price_pence": 999}]
-		}`
-		req := httptest.NewRequest(http.MethodPost, "/api/orders", bytes.NewBufferString(body))
-		rec := httptest.NewRecorder()
-
-		h.Create(rec, req)
-
-		if rec.Code != http.StatusServiceUnavailable {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
-		}
-		if pub.called {
-			t.Fatal("should not publish when persist fails")
-		}
-	})
 }
 
 func TestOrderHandlerIdempotency(t *testing.T) {
@@ -312,7 +228,6 @@ func TestOrderHandlerIdempotency(t *testing.T) {
 	})
 
 	t.Run("replay returns original order", func(t *testing.T) {
-		pub := &recordingPublisher{}
 		h := handler.OrderHandler{
 			Store: fakeOrderStore{
 				createFn: func(context.Context, model.Order) (model.Order, error) {
@@ -326,7 +241,6 @@ func TestOrderHandlerIdempotency(t *testing.T) {
 					return stored, nil
 				},
 			},
-			Events: pub,
 			Idempotency: &fakeIdempotency{
 				acquired: false,
 				existing: idempotency.Record{State: idempotency.StateComplete, OrderID: orderID},
@@ -340,9 +254,6 @@ func TestOrderHandlerIdempotency(t *testing.T) {
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
-		}
-		if pub.called {
-			t.Fatal("replay should not publish")
 		}
 		var got map[string]any
 		if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {

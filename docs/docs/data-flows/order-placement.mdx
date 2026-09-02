@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Order Placement
 
-End-to-end order flow from HTTP request to a ClickHouse analytics row. **The write, publish, consume, and analytics read path are implemented today.**
+End-to-end order flow from HTTP request to a ClickHouse analytics row. **The write, outbox publish, consume, and analytics read path are implemented today.**
 
 ## Implemented today
 
@@ -15,6 +15,7 @@ sequenceDiagram
   participant OrderAPI as order-api_Go
   participant Redis
   participant Postgres
+  participant Poller as outbox_poller
   participant Redpanda
   participant Processor as event-processor_Rust
   participant ClickHouse
@@ -31,17 +32,20 @@ sequenceDiagram
     else key pending
       OrderAPI-->>Client: 409 in progress
     else acquired
-      OrderAPI->>Postgres: BEGIN transaction, insert order and items
+      OrderAPI->>Postgres: BEGIN insert order items outbox
       Postgres-->>OrderAPI: committed
       OrderAPI->>Redis: SET complete order_id EX 3600
-      OrderAPI->>Redpanda: publish order.created
       OrderAPI-->>Client: 201 Created
     end
   else no header
-    OrderAPI->>Postgres: BEGIN transaction, insert order and items
+    OrderAPI->>Postgres: BEGIN insert order items outbox
     Postgres-->>OrderAPI: committed
-    OrderAPI->>Redpanda: publish order.created
     OrderAPI-->>Client: 201 Created
+  end
+  loop every ~300ms
+    Poller->>Postgres: claim unpublished outbox row
+    Poller->>Redpanda: publish order.created
+    Poller->>Postgres: SET published_at
   end
   Redpanda->>Processor: deliver order.created
   Processor->>ClickHouse: INSERT order_events
@@ -76,19 +80,32 @@ What happens:
 1. JSON body is validated (`user_id` UUID, non-empty `items`, positive `qty`, `price_pence` &gt;= 0); catalog prices are checked when `CATALOG_API_URL` is set
 2. `total_pence` is computed server-side
 3. If `Idempotency-Key` is sent, Redis `SET NX` reserves the key (replay → `200`, in-flight → `409`)
-4. Order + line items inserted in one Postgres transaction
+4. Order, line items, and an outbox row inserted in **one** Postgres transaction
 5. Redis key updated to `complete` with `order_id`
-6. `order.created` published to `orders.events` (fail-open if Redpanda is down)
-7. `201` response with order JSON (`status: "pending"`)
+6. `201` response with order JSON (`status: "pending"`) — handler does not call Kafka
+7. In-process outbox poller publishes `order.created` to `orders.events` (typically within ~300 ms)
 8. event-processor inserts ClickHouse `order_events` and sets Postgres status to `processed`
 
 The header is optional. Omit it and every POST creates a new order.
 
 Full API details: [order-api](../services/order-api).
 
+### Outbox demo (broker down)
+
+```bash
+docker compose stop redpanda
+# POST /api/orders → 201
+docker compose exec postgres psql -U streamshop -d streamshop \
+  -c 'SELECT id, topic, published_at FROM outbox ORDER BY id DESC LIMIT 3;'
+docker compose start redpanda
+# published_at fills in; event-processor processes
+```
+
+At scale the poller would run as a **separate worker**; here it is in-process in order-api.
+
 ---
 
-## Full pipeline (planned)
+## Full pipeline
 
 ```mermaid
 sequenceDiagram
@@ -103,10 +120,10 @@ sequenceDiagram
 
   Client->>Traefik: POST /api/orders
   Traefik->>OrderAPI: forward request
-  OrderAPI->>Postgres: "BEGIN transaction, insert order and items"
+  OrderAPI->>Postgres: BEGIN insert order items outbox
   Postgres-->>OrderAPI: committed
-  OrderAPI->>Redpanda: publish order.created
-  OrderAPI-->>Client: "201 Created with order_id"
+  OrderAPI-->>Client: 201 Created with order_id
+  OrderAPI->>Redpanda: outbox poller publishes order.created
 
   Redpanda->>Processor: deliver order.created
   Processor->>Processor: validate JSON schema
@@ -121,10 +138,10 @@ sequenceDiagram
   AnalyticsAPI-->>Client: 200 JSON summary
 ```
 
-### Planned steps after order creation
+### Pipeline status
 
 - **Idempotency** — `Idempotency-Key` header + Redis *(built)*
-- **Event publish** — `order.created` to Redpanda topic `orders.events` *(built; fail-open)*
+- **Transactional outbox** — same-TX insert; in-process poller publishes *(built)*
 - **Async processing** — Rust consumer → ClickHouse + status update *(built)*
 - **Analytics** — `GET /api/analytics/orders/summary` via Traefik *(built)*
 
@@ -132,12 +149,12 @@ sequenceDiagram
 
 | Failure | Behaviour |
 |---------|------------------|
-| Postgres unavailable | `503` from order-api; no event published |
+| Postgres unavailable | `503` from order-api; no order or outbox row |
 | Redis unavailable + `Idempotency-Key` | `503` `idempotency unavailable`; no order created |
 | Redis unavailable, no header | Order created as usual |
 | Duplicate `Idempotency-Key` (complete) | `200` with the original order |
 | Duplicate `Idempotency-Key` (in progress) | `409` |
-| Redpanda unavailable | Order saved; `201`; error logged *(outbox planned)* |
+| Redpanda unavailable | Order + outbox row saved; `201`; poller retries until broker recovers, then event publishes |
 | Processor crash | Offset not committed; redelivery on restart |
 | Invalid event schema | Message to `orders.events.dlq` |
 

@@ -10,7 +10,7 @@ StreamShop uses **Redpanda** as its message broker. This is a Kafka-compatible e
 
 Redpanda **v26.2.1** runs in Compose (`streamshop-redpanda`). Kafka API from the host is `localhost:19092`; other Compose services use `redpanda:9092`. Admin API is `localhost:9644`. Data is stored on the `redpanda_data` volume. `--mode dev-container` and `--smp 1` keep it suitable for a laptop. Not behind Traefik.
 
-After `POST /api/orders` commits to Postgres, order-api publishes `order.created` to `orders.events`. event-processor consumes the topic (group `event-processor`), writes ClickHouse, marks the order `processed`, then commits the offset. Invalid payloads go to `orders.events.dlq`.
+On `POST /api/orders`, order-api commits the order and an **outbox** row in one Postgres transaction, returns `201`, then an in-process **poller** (~300 ms) publishes `order.created` to `orders.events`. event-processor consumes the topic (group `event-processor`), writes ClickHouse, marks the order `processed`, then commits the offset. Invalid payloads go to `orders.events.dlq`.
 
 Redpanda Console is a local debug GUI on [http://localhost:8082](http://localhost:8082) (not behind Traefik).
 
@@ -39,7 +39,7 @@ docker compose exec redpanda rpk topic consume orders.events --num 1
 
 ## Event schema
 
-[order-api](../services/order-api) publishes this JSON; [event-processor](../services/event-processor) validates it with serde (required fields, `event_type`, non-empty `items`):
+[order-api](../services/order-api) stores this JSON in the outbox (and publishes it unchanged); [event-processor](../services/event-processor) validates it with serde (required fields, `event_type`, non-empty `items`):
 
 ```json
 {
@@ -58,16 +58,20 @@ docker compose exec redpanda rpk topic consume orders.events --num 1
 
 | Role | Service | Client library | Status |
 |------|---------|----------------|--------|
-| Producer | `order-api` (Go) | kafka-go | **Built** |
+| Producer | `order-api` outbox poller (Go) | kafka-go | **Built** |
 | Consumer | `event-processor` (Rust) | rust-rdkafka | **Built** |
+
+At scale the outbox poller would typically be a **separate worker**; here it runs in-process in order-api.
 
 ## Delivery semantics
 
 **Today (consume path):** event-processor is at-least-once. Offset commits after ClickHouse insert and Postgres status update. Storage failures retry the same message. Invalid JSON goes to `orders.events.dlq` then the offset is committed.
 
-**Today (produce path):** order-api writes to Postgres, then publishes. If produce fails, the order still exists (`201`, error logged). That is a dual-write gap — an outbox is planned, not built.
+**Today (produce path):** transactional outbox. Order + outbox row commit together; the poller publishes stored payloads and sets `published_at`. If Redpanda is down, rows stay unpublished and retry on the next tick — the order still gets `201`.
 
-ReplacingMergeTree on `order_id` and an idempotent Postgres status update keep duplicate deliveries from stacking extra facts. HTTP `Idempotency-Key` on order-api (Redis `SET NX EX 3600`) stops client retries from inserting a second order. A transactional outbox for the produce path is still planned.
+ReplacingMergeTree on `order_id` and an idempotent Postgres status update keep duplicate deliveries from stacking extra facts. HTTP `Idempotency-Key` on order-api (Redis `SET NX EX 3600`) stops client retries from inserting a second order.
+
+See [ADR: At-least-once delivery](../adr/at-least-once-delivery) and [ADR: Transactional outbox](../adr/transactional-outbox).
 
 ## Consumer group
 
@@ -78,5 +82,3 @@ Strategy: range
 ```
 
 Scaling to multiple processor instances is done by adding consumers to the same group — Redpanda assigns partitions automatically.
-
-See [ADR: At-least-once delivery](../adr/at-least-once-delivery) for the full rationale.
