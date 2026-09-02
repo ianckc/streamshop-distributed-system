@@ -56,10 +56,34 @@ Expected output: catalog list includes `prod-001`, a sample order is created as 
 
 | Store | Command |
 |-------|---------|
-| PostgreSQL | `docker compose exec postgres psql -U streamshop -c 'TRUNCATE orders, order_items CASCADE'` |
+| PostgreSQL | `docker compose exec postgres psql -U streamshop -d streamshop -c 'TRUNCATE outbox, orders, order_items CASCADE'` |
 | MongoDB | `docker compose exec mongo mongosh streamshop --eval 'db.products.deleteMany({})'` |
 | ClickHouse | `docker compose exec clickhouse clickhouse-client --user streamshop --password streamshop --database streamshop -q 'TRUNCATE TABLE order_events'` |
 | Redis | `docker compose exec redis redis-cli FLUSHALL` |
 | MinIO | `docker compose exec minio mc rm --recursive --force local/product-images/` |
 
 After a partial reset, run `make seed` to restore sample catalog data and images.
+
+## Apply Postgres schema changes (existing volume)
+
+Postgres runs `infra/postgres/init.sql` only when the `postgres_data` volume is **empty** (first container start). If you already have local data and a new migration is added (for example the transactional `outbox` table), either wipe and recreate or apply the incremental script.
+
+**Wipe all data** (simplest for demos):
+
+```bash
+docker compose down -v
+make up
+make seed
+```
+
+**Keep data** — apply the migration script from the repo root:
+
+```bash
+docker compose exec -T postgres psql -U streamshop -d streamshop < infra/postgres/outbox.sql
+```
+
+Verify:
+
+```bash
+docker compose exec postgres psql -U streamshop -d streamshop -c '\d outbox'
+```

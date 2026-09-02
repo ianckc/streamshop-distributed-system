@@ -19,3 +19,16 @@ CREATE TABLE IF NOT EXISTS order_items (
 
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders (user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders (created_at DESC);
+
+-- Transactional outbox (order-api): same-TX as orders; poller publishes to Kafka.
+CREATE TABLE IF NOT EXISTS outbox (
+    id           BIGSERIAL PRIMARY KEY,
+    topic        TEXT NOT NULL,
+    message_key  TEXT NOT NULL,
+    payload      JSONB NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    published_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_outbox_unpublished
+    ON outbox (id) WHERE published_at IS NULL;
