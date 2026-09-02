@@ -2,11 +2,13 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/ianckc/distributed-systems/services/order-api/internal/events"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/model"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/store"
 	"github.com/jackc/pgx/v5"
@@ -81,13 +83,29 @@ func (s *OrderStore) CreateOrder(ctx context.Context, order model.Order) (model.
 	}
 	itemSpan.End()
 
+	order.CreatedAt = createdAt
+	payload, err := json.Marshal(events.NewOrderCreated(order))
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return model.Order{}, fmt.Errorf("marshal outbox payload: %w", err)
+	}
+	_, err = tx.Exec(ctx, `
+		INSERT INTO outbox (topic, message_key, payload)
+		VALUES ($1, $2, $3)
+	`, events.TopicOrdersEvents, order.ID.String(), payload)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return model.Order{}, fmt.Errorf("insert outbox: %w", err)
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return model.Order{}, fmt.Errorf("commit tx: %w", err)
 	}
 
-	order.CreatedAt = createdAt
 	return order, nil
 }
 
