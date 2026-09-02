@@ -42,6 +42,7 @@ const sidebars: SidebarsConfig = {
         'adr/clickhouse-for-olap',
         'adr/mongo-for-catalog',
         'adr/at-least-once-delivery',
+        'adr/transactional-outbox',
       ],
     },
     {

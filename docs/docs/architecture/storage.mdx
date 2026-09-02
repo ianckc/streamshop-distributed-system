@@ -10,7 +10,7 @@ StreamShop uses distinct storage technologies, each chosen for a specific access
 
 | Store | Type | Technology | Primary data |
 |-------|------|------------|--------------|
-| PostgreSQL | SQL (OLTP) | PostgreSQL 18 | Orders, order items |
+| PostgreSQL | SQL (OLTP) | PostgreSQL 18 | Orders, order items, transactional outbox |
 | MongoDB | NoSQL | MongoDB 8 | Product catalog (flexible schema) |
 | ClickHouse | OLAP | ClickHouse 24 | Order event facts, aggregates |
 | MinIO | Object | MinIO (S3-compatible) | Product images, CSV exports |
@@ -35,9 +35,20 @@ CREATE TABLE order_items (
   qty         INTEGER NOT NULL,
   price_pence INTEGER NOT NULL
 );
+
+CREATE TABLE outbox (
+  id           BIGSERIAL PRIMARY KEY,
+  topic        TEXT NOT NULL,
+  message_key  TEXT NOT NULL,
+  payload      JSONB NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  published_at TIMESTAMPTZ
+);
 ```
 
-**Accessed by:** `order-api` (writes), `event-processor` (status updates), `analytics-api` (detail reads)
+**Accessed by:** `order-api` (writes orders + outbox; poller publishes outbox), `event-processor` (status updates), `analytics-api` (detail reads)
+
+Schema in `infra/postgres/init.sql`. Apply `infra/postgres/outbox.sql` on existing volumes — see [Reset Data](../runbooks/reset-data).
 
 ## MongoDB (NoSQL)
 

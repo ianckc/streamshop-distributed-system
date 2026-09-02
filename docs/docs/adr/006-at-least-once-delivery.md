@@ -11,16 +11,18 @@ The order pipeline spans HTTP (order-api), a message broker (Redpanda), and an a
 Options considered:
 
 - **At-most-once** — fire and forget; may lose messages
-- **At-least-once with idempotent consumers** — may duplicate; no message loss
-- **Exactly-once** — Kafka transactions + idempotent producer; complex
+- **At-least-once with idempotent consumers** — may duplicate; no message loss on the consume path
+- **Exactly-once** — Kafka transactions + idempotent producer + distributed coordination; complex
 
 ## Decision
 
-Implement **at-least-once delivery** with idempotency at both the HTTP and consumer layers.
+Implement **at-least-once delivery** with idempotency at the HTTP, produce, and consumer layers.
 
 ## Rationale
 
-Exactly-once semantics require Kafka transactions, an outbox pattern, and distributed coordination — valuable but disproportionate for a local demo. At-least-once with idempotency is what most production systems actually run.
+Exactly-once end-to-end is valuable in production but disproportionate for a local demo. At-least-once with idempotency is what most production systems actually run.
+
+The **produce path** uses a transactional outbox ([ADR 007](./transactional-outbox)) so orders and event intent commit atomically; an in-process poller publishes to Kafka. That removes lost events from dual-write; duplicates on republish are still possible.
 
 ### Idempotency layers
 
@@ -33,6 +35,6 @@ The processor commits the Kafka offset **after** successful ClickHouse write and
 
 ## Consequences
 
-- **Positive:** No message loss; realistic production pattern; simpler than exactly-once
-- **Negative:** Duplicate events possible during failures (handled by consumer idempotency). HTTP retries with a key do not create duplicate orders.
-- **Mitigation:** DLQ (`orders.events.dlq`) for messages that fail schema validation. Bounded retries then DLQ for storage failures are not built yet. A transactional outbox for the produce path is not built yet.
+- **Positive:** No lost events on the produce path (outbox); realistic production pattern; simpler than exactly-once end-to-end
+- **Negative:** Duplicate events possible if the poller republishes or the consumer redelivers (handled by consumer idempotency). HTTP retries with a key do not create duplicate orders.
+- **Mitigation:** DLQ (`orders.events.dlq`) for messages that fail schema validation. Bounded retries then DLQ for storage failures are not built yet.
