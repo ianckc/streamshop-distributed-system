@@ -32,35 +32,37 @@ func NewKafkaPublisher(brokersCSV string) *KafkaPublisher {
 }
 
 func (p *KafkaPublisher) PublishOrderCreated(ctx context.Context, order model.Order) error {
+	event := NewOrderCreated(order)
+	value, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	return p.Publish(ctx, TopicOrdersEvents, event.OrderID, value)
+}
+
+func (p *KafkaPublisher) Publish(ctx context.Context, topic, key string, payload []byte) error {
 	tracer := otel.Tracer("order-api")
-	ctx, span := tracer.Start(ctx, "kafka.publish order.created",
+	ctx, span := tracer.Start(ctx, "kafka.publish",
 		trace.WithSpanKind(trace.SpanKindProducer),
 	)
 	defer span.End()
 	span.SetAttributes(
 		semconv.MessagingSystemKey.String("kafka"),
-		semconv.MessagingDestinationNameKey.String(TopicOrdersEvents),
-		attribute.String("order.id", order.ID.String()),
+		semconv.MessagingDestinationNameKey.String(topic),
+		attribute.String("messaging.kafka.message.key", key),
 	)
-
-	event := NewOrderCreated(order)
-	value, err := json.Marshal(event)
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		return err
-	}
 
 	carrier := propagation.MapCarrier{}
 	otel.GetTextMapPropagator().Inject(ctx, carrier)
 	headers := make([]kafka.Header, 0, len(carrier))
-	for key, val := range carrier {
-		headers = append(headers, kafka.Header{Key: key, Value: []byte(val)})
+	for k, val := range carrier {
+		headers = append(headers, kafka.Header{Key: k, Value: []byte(val)})
 	}
 
-	err = p.writer.WriteMessages(ctx, kafka.Message{
-		Key:     []byte(event.OrderID),
-		Value:   value,
+	err := p.writer.WriteMessages(ctx, kafka.Message{
+		Topic:   topic,
+		Key:     []byte(key),
+		Value:   payload,
 		Headers: headers,
 	})
 	if err != nil {
