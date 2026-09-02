@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/ianckc/distributed-systems/services/order-api/internal/events"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/handler"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/idempotency"
+	"github.com/ianckc/distributed-systems/services/order-api/internal/outbox"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/redisclient"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/store/postgres"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/telemetry"
@@ -62,7 +64,22 @@ func main() {
 			slog.Error("failed to close kafka publisher", "error", err)
 		}
 	}()
-	orderHandler := handler.OrderHandler{Store: orderStore, Events: publisher}
+
+	outboxStore := outbox.NewPostgresStore(pool)
+	pollerCtx, pollerCancel := context.WithCancel(context.Background())
+	var pollerWG sync.WaitGroup
+	pollerWG.Add(1)
+	go func() {
+		defer pollerWG.Done()
+		(&outbox.Poller{
+			Store:    outboxStore,
+			Publish:  publisher.Publish,
+			Interval: outbox.DefaultInterval,
+		}).Run(pollerCtx)
+	}()
+	slog.Info("outbox poller started", "interval", outbox.DefaultInterval)
+
+	orderHandler := handler.OrderHandler{Store: orderStore}
 
 	if cfg.RedisURL != "" {
 		redisCtx, redisCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -115,6 +132,9 @@ func main() {
 	defer shutdownCancel()
 
 	slog.Info("shutting down")
+	pollerCancel()
+	pollerWG.Wait()
+
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		slog.Error("shutdown failed", "error", err)
 		os.Exit(1)

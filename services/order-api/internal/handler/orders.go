@@ -12,7 +12,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/catalog"
-	"github.com/ianckc/distributed-systems/services/order-api/internal/events"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/idempotency"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/model"
 	"github.com/ianckc/distributed-systems/services/order-api/internal/store"
@@ -29,7 +28,6 @@ type IdempotencyStore interface {
 
 type OrderHandler struct {
 	Store       store.OrderStore
-	Events      events.Publisher
 	Catalog     catalog.ProductGetter
 	Idempotency IdempotencyStore
 }
@@ -126,15 +124,6 @@ func (h OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
 		if err := h.Idempotency.Complete(ctx, idempotencyKey, created.ID); err != nil {
 			span.RecordError(err)
 			slog.ErrorContext(ctx, "idempotency complete failed", "error", err, "order_id", created.ID)
-		}
-	}
-
-	if h.Events != nil {
-		pubCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		defer cancel()
-		if err := h.Events.PublishOrderCreated(pubCtx, created); err != nil {
-			span.RecordError(err)
-			slog.ErrorContext(ctx, "failed to publish order.created", "error", err, "order_id", created.ID)
 		}
 	}
 

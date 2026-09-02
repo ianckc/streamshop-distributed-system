@@ -23,7 +23,6 @@ func NewKafkaPublisher(brokersCSV string) *KafkaPublisher {
 	return &KafkaPublisher{
 		writer: &kafka.Writer{
 			Addr:                   kafka.TCP(splitBrokers(brokersCSV)...),
-			Topic:                  TopicOrdersEvents,
 			Balancer:               &kafka.Hash{},
 			RequiredAcks:           kafka.RequireOne,
 			AllowAutoTopicCreation: true,
