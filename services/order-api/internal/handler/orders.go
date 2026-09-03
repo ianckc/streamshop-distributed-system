@@ -77,6 +77,12 @@ func (h OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
 				writeJSON(w, http.StatusBadRequest, errorResponse{Error: validationErr.Error()})
 				return
 			}
+			if errors.Is(err, catalog.ErrCircuitOpen) {
+				slog.WarnContext(ctx, "catalog circuit breaker open, rejecting order")
+				span.SetAttributes(attribute.Bool("circuit_breaker.open", true))
+				writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "catalog service temporarily unavailable"})
+				return
+			}
 			slog.ErrorContext(ctx, "catalog validation failed", "error", err)
 			writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "catalog unavailable"})
 			return
