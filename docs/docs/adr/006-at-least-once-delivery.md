@@ -37,4 +37,6 @@ The processor commits the Kafka offset **after** successful ClickHouse write and
 
 - **Positive:** No lost events on the produce path (outbox); realistic production pattern; simpler than exactly-once end-to-end
 - **Negative:** Duplicate events possible if the poller republishes or the consumer redelivers (handled by consumer idempotency). HTTP retries with a key do not create duplicate orders.
-- **Mitigation:** DLQ (`orders.events.dlq`) for messages that fail schema validation. Bounded retries then DLQ for storage failures are not built yet.
+- **Mitigation:** DLQ (`orders.events.dlq`) for two failure classes:
+  - **Poison** — permanently unprocessable messages (bad JSON, wrong `event_type`, empty `items`, negative `total_pence`). Sent to DLQ immediately; offset committed; no retry.
+  - **Transient** — storage failures (ClickHouse / Postgres unavailable). Retried up to `STORAGE_MAX_RETRIES` times (default 5, 1 s sleep). If still failing, sent to DLQ with a reason prefixed `storage: exhausted after N retries: …` so operators can distinguish from poison. The trade-off: a prolonged backend outage parks messages in the DLQ rather than blocking the consumer forever.

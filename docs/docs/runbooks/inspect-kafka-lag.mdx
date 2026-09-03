@@ -48,15 +48,22 @@ curl http://localhost:3004/health
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
 | Lag growing steadily | Processor crashed | `docker compose restart event-processor` |
-| Lag spike then recovery | Transient ClickHouse slow write | Monitor; add retry if recurring |
+| Lag spike then recovery | Transient ClickHouse slow write | Monitor; retries happen automatically (up to `STORAGE_MAX_RETRIES`, default 5) |
+| Lag stuck, then advances | Storage retries exhausted | Messages moved to DLQ after max retries. Check DLQ for `storage: exhausted …` reasons |
 | Lag stuck, no errors | Offset committed but write failed | Check DLQ: `rpk topic consume orders.events.dlq` |
-| Messages in DLQ | Schema validation failure | Fix schema or event payload; replay from DLQ |
+| Messages in DLQ (poison) | Schema validation failure (bad JSON, wrong event_type) | Fix schema or event payload; replay from DLQ |
+| Messages in DLQ (transient) | Storage retries exhausted (ClickHouse/Postgres down too long) | Restore backend, then replay from DLQ. Reason key starts with `storage: …` |
 
 ## Replay from DLQ
 
+The DLQ holds two classes of message. The Kafka **key** on each record tells you which:
+
+- **Poison** — key is the validation reason (e.g. `invalid JSON: …`, `event_type must be …`). Fix the producer or schema, then replay.
+- **Storage-exhausted** — key starts with `storage: exhausted after N retries: …`. The payload itself is valid; the backend was unavailable. Restore the backend, then replay.
+
 ```bash
-# Inspect poison messages
-docker compose exec redpanda rpk topic consume orders.events.dlq --num 5
+# Inspect DLQ messages (key + value)
+docker compose exec redpanda rpk topic consume orders.events.dlq --num 5 --print-key
 
 # After fixing the root cause, re-publish manually
 docker compose exec redpanda rpk topic produce orders.events \
