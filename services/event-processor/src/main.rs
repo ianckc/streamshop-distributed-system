@@ -4,9 +4,9 @@ use std::sync::Arc;
 use event_processor::analytics::ClickHouseAnalytics;
 use event_processor::config::Config;
 use event_processor::consume::{handle_message, send_storage_exhausted_to_dlq_and_commit, KafkaIO};
-use event_processor::process::should_dlq;
 use event_processor::http::{router, AppState};
 use event_processor::orders::PostgresOrders;
+use event_processor::process::should_dlq;
 use event_processor::telemetry::init_propagation;
 use opentelemetry::trace::TracerProvider;
 use tokio::net::TcpListener;
@@ -107,13 +107,11 @@ async fn main() -> anyhow::Result<()> {
                                         max_retries,
                                         "storage retries exhausted; sending to DLQ",
                                     );
-                                    let payload =
-                                        rdkafka::Message::payload(&msg).unwrap_or(&[]);
-                                    if let Err(dlq_err) =
-                                        send_storage_exhausted_to_dlq_and_commit(
-                                            &kafka, &msg, payload, attempt, &err,
-                                        )
-                                        .await
+                                    let payload = rdkafka::Message::payload(&msg).unwrap_or(&[]);
+                                    if let Err(dlq_err) = send_storage_exhausted_to_dlq_and_commit(
+                                        &kafka, &msg, payload, attempt, &err,
+                                    )
+                                    .await
                                     {
                                         tracing::error!(
                                             error = %dlq_err,
