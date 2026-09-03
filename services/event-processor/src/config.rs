@@ -13,6 +13,7 @@ pub struct Config {
     pub clickhouse_user: String,
     pub clickhouse_password: String,
     pub clickhouse_database: String,
+    pub storage_max_retries: u32,
 }
 
 impl Config {
@@ -55,6 +56,12 @@ impl Config {
                 .ok()
                 .filter(|v| !v.is_empty())
                 .unwrap_or_else(|| "streamshop".into()),
+            storage_max_retries: env::var("STORAGE_MAX_RETRIES")
+                .ok()
+                .filter(|v| !v.is_empty())
+                .unwrap_or_else(|| "5".into())
+                .parse()
+                .map_err(|_| anyhow::anyhow!("STORAGE_MAX_RETRIES must be a number"))?,
         })
     }
 }
