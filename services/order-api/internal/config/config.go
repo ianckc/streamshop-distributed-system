@@ -7,11 +7,11 @@ import (
 )
 
 type Config struct {
-	Port          string
-	ServiceName   string
-	DatabaseURL   string
-	KafkaBrokers  string
-	CatalogAPIURL string
+	Port           string
+	ServiceName    string
+	DatabaseURL    string
+	KafkaBrokers   string
+	CatalogAPIURL  string
 	RedisURL       string
 	CatalogTimeout time.Duration
 	CBMaxRequests  uint32
