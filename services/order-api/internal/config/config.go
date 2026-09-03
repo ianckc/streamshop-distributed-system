@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"time"
 )
 
 type Config struct {
@@ -11,7 +12,8 @@ type Config struct {
 	DatabaseURL   string
 	KafkaBrokers  string
 	CatalogAPIURL string
-	RedisURL      string
+	RedisURL       string
+	CatalogTimeout time.Duration
 }
 
 func Load() (Config, error) {
@@ -35,13 +37,23 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("KAFKA_BROKERS is required")
 	}
 
+	catalogTimeout := 2 * time.Second
+	if v := os.Getenv("CATALOG_TIMEOUT"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return Config{}, fmt.Errorf("invalid CATALOG_TIMEOUT %q: %w", v, err)
+		}
+		catalogTimeout = d
+	}
+
 	return Config{
-		Port:          port,
-		ServiceName:   serviceName,
-		DatabaseURL:   databaseURL,
-		KafkaBrokers:  kafkaBrokers,
-		CatalogAPIURL: os.Getenv("CATALOG_API_URL"),
-		RedisURL:      os.Getenv("REDIS_URL"),
+		Port:           port,
+		ServiceName:    serviceName,
+		DatabaseURL:    databaseURL,
+		KafkaBrokers:   kafkaBrokers,
+		CatalogAPIURL:  os.Getenv("CATALOG_API_URL"),
+		RedisURL:       os.Getenv("REDIS_URL"),
+		CatalogTimeout: catalogTimeout,
 	}, nil
 }
 
