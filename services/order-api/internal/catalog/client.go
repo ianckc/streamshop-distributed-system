@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -13,6 +14,9 @@ import (
 
 	"github.com/sony/gobreaker/v2"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -51,6 +55,13 @@ func NewClient(baseURL string, timeout time.Duration, bs BreakerSettings) *Clien
 		ReadyToTrip: func(counts gobreaker.Counts) bool {
 			return counts.ConsecutiveFailures >= 5
 		},
+		OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
+			slog.Warn("circuit breaker state change",
+				"breaker", name,
+				"from", from.String(),
+				"to", to.String(),
+			)
+		},
 	})
 
 	return &Client{
@@ -64,11 +75,22 @@ func NewClient(baseURL string, timeout time.Duration, bs BreakerSettings) *Clien
 }
 
 func (c *Client) GetProduct(ctx context.Context, productID string) (Product, error) {
+	tracer := otel.Tracer("order-api")
+	ctx, span := tracer.Start(ctx, "catalog.get_product",
+		trace.WithAttributes(
+			attribute.String("catalog.product_id", productID),
+			attribute.String("circuit_breaker.state", c.breaker.State().String()),
+		),
+	)
+	defer span.End()
+
 	product, err := c.breaker.Execute(func() (Product, error) {
 		return c.doGetProduct(ctx, productID)
 	})
 	if err != nil {
+		span.SetAttributes(attribute.String("circuit_breaker.state", c.breaker.State().String()))
 		if errors.Is(err, gobreaker.ErrOpenState) || errors.Is(err, gobreaker.ErrTooManyRequests) {
+			span.AddEvent("circuit breaker rejected request")
 			return Product{}, ErrCircuitOpen
 		}
 		return Product{}, err
