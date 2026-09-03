@@ -99,8 +99,18 @@ func main() {
 	}
 
 	if cfg.CatalogAPIURL != "" {
-		orderHandler.Catalog = catalog.NewClient(cfg.CatalogAPIURL)
-		slog.Info("catalog validation enabled", "url", cfg.CatalogAPIURL)
+		orderHandler.Catalog = catalog.NewClient(cfg.CatalogAPIURL, cfg.CatalogTimeout, catalog.BreakerSettings{
+			MaxRequests: cfg.CBMaxRequests,
+			Interval:    cfg.CBInterval,
+			Timeout:     cfg.CBTimeout,
+		})
+		slog.Info("catalog validation enabled",
+			"url", cfg.CatalogAPIURL,
+			"timeout", cfg.CatalogTimeout,
+			"cb_max_requests", cfg.CBMaxRequests,
+			"cb_interval", cfg.CBInterval,
+			"cb_timeout", cfg.CBTimeout,
+		)
 	}
 
 	mux := http.NewServeMux()
