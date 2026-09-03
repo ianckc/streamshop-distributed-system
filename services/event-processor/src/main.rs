@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use event_processor::analytics::ClickHouseAnalytics;
 use event_processor::config::Config;
-use event_processor::consume::{handle_message, KafkaIO};
+use event_processor::consume::{handle_message, send_storage_exhausted_to_dlq_and_commit, KafkaIO};
 use event_processor::http::{router, AppState};
 use event_processor::orders::PostgresOrders;
 use event_processor::telemetry::init_propagation;
@@ -82,6 +82,7 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    let max_retries = cfg.storage_max_retries;
     let consume = tokio::spawn(async move {
         loop {
             match kafka.consumer.recv().await {
@@ -89,15 +90,49 @@ async fn main() -> anyhow::Result<()> {
                     tracing::error!(error = %err, "kafka recv failed");
                     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                 }
-                Ok(msg) => loop {
-                    match handle_message(&kafka, &msg, analytics.as_ref(), orders.as_ref()).await {
-                        Ok(()) => break,
-                        Err(err) => {
-                            tracing::error!(error = %err, "message not committed; retrying");
-                            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                Ok(msg) => {
+                    let mut attempt = 0u32;
+                    loop {
+                        match handle_message(&kafka, &msg, analytics.as_ref(), orders.as_ref())
+                            .await
+                        {
+                            Ok(()) => break,
+                            Err(err) => {
+                                attempt += 1;
+                                if attempt >= max_retries {
+                                    tracing::error!(
+                                        error = %err,
+                                        attempt,
+                                        max_retries,
+                                        "storage retries exhausted; sending to DLQ",
+                                    );
+                                    let payload =
+                                        rdkafka::Message::payload(&msg).unwrap_or(&[]);
+                                    if let Err(dlq_err) =
+                                        send_storage_exhausted_to_dlq_and_commit(
+                                            &kafka, &msg, payload, attempt, &err,
+                                        )
+                                        .await
+                                    {
+                                        tracing::error!(
+                                            error = %dlq_err,
+                                            "failed to send exhausted message to DLQ; will retry",
+                                        );
+                                        continue;
+                                    }
+                                    break;
+                                }
+                                tracing::error!(
+                                    error = %err,
+                                    attempt,
+                                    max_retries,
+                                    "message not committed; retrying",
+                                );
+                                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                            }
                         }
                     }
-                },
+                }
             }
         }
     });
