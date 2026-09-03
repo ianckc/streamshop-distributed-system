@@ -35,7 +35,7 @@ docker compose exec redpanda rpk topic consume orders.events --num 1
 | Topic | Status | Purpose |
 |-------|--------|---------|
 | `orders.events` | **Built** (auto-created on first produce) | Order lifecycle events |
-| `orders.events.dlq` | **Built** (invalid payloads) | Poison messages |
+| `orders.events.dlq` | **Built** | Poison messages (invalid payloads) and storage-exhausted messages |
 
 ## Event schema
 
@@ -65,7 +65,10 @@ At scale the outbox poller would typically be a **separate worker**; here it run
 
 ## Delivery semantics
 
-**Today (consume path):** event-processor is at-least-once. Offset commits after ClickHouse insert and Postgres status update. Storage failures retry the same message. Invalid JSON goes to `orders.events.dlq` then the offset is committed.
+**Today (consume path):** event-processor is at-least-once. Offset commits after ClickHouse insert and Postgres status update. Failures are handled in two classes:
+
+- **Poison** (bad JSON / schema) — sent to `orders.events.dlq` immediately, then offset committed. No retry.
+- **Transient** (storage failures) — retried up to `STORAGE_MAX_RETRIES` times (default 5, 1 s sleep). If still failing, sent to `orders.events.dlq` with a `storage: exhausted after N retries: …` reason, then offset committed. The consumer advances rather than blocking forever.
 
 **Today (produce path):** transactional outbox. Order + outbox row commit together; the poller publishes stored payloads and sets `published_at`. If Redpanda is down, rows stay unpublished and retry on the next tick — the order still gets `201`.
 

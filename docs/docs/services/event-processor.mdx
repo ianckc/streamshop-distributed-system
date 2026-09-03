@@ -74,7 +74,10 @@ Postgres or ClickHouse unavailable → `503` `{"error":"not ready"}`.
 4. `UPDATE orders SET status = 'processed' WHERE id = $1`
 5. Commits the Kafka offset **after** both writes
 
-Invalid JSON / schema → original payload to `orders.events.dlq`, then commit (do not retry forever). Storage errors → **do not** commit; retry the same message.
+Failures are classified as **poison** or **transient**:
+
+- **Poison** (invalid JSON / schema) — original payload sent to `orders.events.dlq` immediately, then offset committed. No retry.
+- **Transient** (ClickHouse / Postgres failure) — retried up to `STORAGE_MAX_RETRIES` times (default 5, 1 s sleep between attempts). If still failing after all retries, the payload is sent to `orders.events.dlq` with a reason prefixed `storage: …`, then the offset is committed. This prevents a single backend outage from blocking the entire consumer.
 
 ## Demo
 
@@ -104,8 +107,9 @@ Redpanda Console: [http://localhost:8082](http://localhost:8082) — consumer gr
 | `SERVICE_NAME` | `event-processor` | Shown in health/ready JSON |
 | `KAFKA_BROKERS` | *(required)* | Compose: `redpanda:9092`; host: `localhost:19092` |
 | `KAFKA_TOPIC` | `orders.events` | Input topic |
-| `KAFKA_DLQ_TOPIC` | `orders.events.dlq` | Invalid payloads |
+| `KAFKA_DLQ_TOPIC` | `orders.events.dlq` | Poison and storage-exhausted payloads |
 | `KAFKA_GROUP_ID` | `event-processor` | Consumer group |
+| `STORAGE_MAX_RETRIES` | `5` | Max storage-failure retries before DLQ |
 | `DATABASE_URL` | *(required)* | Postgres URL |
 | `CLICKHOUSE_URL` | *(required)* | HTTP interface (`http://clickhouse:8123`) |
 | `CLICKHOUSE_USER` | `streamshop` | ClickHouse user |

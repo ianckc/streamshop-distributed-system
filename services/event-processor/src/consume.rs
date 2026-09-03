@@ -67,11 +67,7 @@ pub async fn handle_message(
             }
             Err(ProcessError::Invalid(reason)) => {
                 tracing::warn!(error = %reason, "invalid order.created; sending to DLQ");
-                send_dlq(kafka, payload, &reason).await?;
-                kafka
-                    .consumer
-                    .commit_message(msg, rdkafka::consumer::CommitMode::Sync)?;
-                Ok(())
+                send_dlq_and_commit(kafka, msg, payload, &reason).await
             }
             Err(ProcessError::Storage(err)) => {
                 tracing::error!(error = %err, "storage failure; will retry");
@@ -81,6 +77,30 @@ pub async fn handle_message(
     }
     .instrument(span)
     .await
+}
+
+pub async fn send_storage_exhausted_to_dlq_and_commit(
+    kafka: &KafkaIO,
+    msg: &BorrowedMessage<'_>,
+    payload: &[u8],
+    attempts: u32,
+    err: &anyhow::Error,
+) -> anyhow::Result<()> {
+    let reason = crate::process::storage_exhaustion_reason(attempts, err);
+    send_dlq_and_commit(kafka, msg, payload, &reason).await
+}
+
+pub async fn send_dlq_and_commit(
+    kafka: &KafkaIO,
+    msg: &BorrowedMessage<'_>,
+    payload: &[u8],
+    reason: &str,
+) -> anyhow::Result<()> {
+    send_dlq(kafka, payload, reason).await?;
+    kafka
+        .consumer
+        .commit_message(msg, rdkafka::consumer::CommitMode::Sync)?;
+    Ok(())
 }
 
 async fn send_dlq(kafka: &KafkaIO, payload: &[u8], reason: &str) -> anyhow::Result<()> {
