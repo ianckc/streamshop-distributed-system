@@ -86,7 +86,7 @@ pub async fn send_storage_exhausted_to_dlq_and_commit(
     attempts: u32,
     err: &anyhow::Error,
 ) -> anyhow::Result<()> {
-    let reason = format!("storage: exhausted after {attempts} retries: {err}");
+    let reason = crate::process::storage_exhaustion_reason(attempts, err);
     send_dlq_and_commit(kafka, msg, payload, &reason).await
 }
 

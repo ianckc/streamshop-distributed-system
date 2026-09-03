@@ -45,6 +45,14 @@ pub enum ProcessError {
     Storage(#[from] anyhow::Error),
 }
 
+pub fn storage_exhaustion_reason(attempts: u32, err: &anyhow::Error) -> String {
+    format!("storage: exhausted after {attempts} retries: {err}")
+}
+
+pub fn should_dlq(attempt: u32, max_retries: u32) -> bool {
+    attempt >= max_retries
+}
+
 pub async fn process_order_created(
     payload: &[u8],
     analytics: &dyn AnalyticsStore,
@@ -183,5 +191,51 @@ mod tests {
             .unwrap_err();
         assert!(matches!(err, ProcessError::Storage(_)));
         assert!(orders.ids.lock().unwrap().is_empty());
+    }
+
+    // --- should_dlq decision boundary ---
+
+    #[test]
+    fn should_dlq_false_when_under_limit() {
+        assert!(!should_dlq(0, 5));
+        assert!(!should_dlq(1, 5));
+        assert!(!should_dlq(4, 5));
+    }
+
+    #[test]
+    fn should_dlq_true_at_limit() {
+        assert!(should_dlq(5, 5));
+    }
+
+    #[test]
+    fn should_dlq_true_above_limit() {
+        assert!(should_dlq(6, 5));
+        assert!(should_dlq(100, 5));
+    }
+
+    #[test]
+    fn should_dlq_with_max_one_retries_on_first_attempt() {
+        assert!(!should_dlq(0, 1));
+        assert!(should_dlq(1, 1));
+    }
+
+    // --- storage_exhaustion_reason formatting ---
+
+    #[test]
+    fn exhaustion_reason_contains_attempt_count() {
+        let err = anyhow::anyhow!("clickhouse connection refused");
+        let reason = storage_exhaustion_reason(5, &err);
+        assert!(reason.starts_with("storage: "));
+        assert!(reason.contains("5 retries"));
+        assert!(reason.contains("clickhouse connection refused"));
+    }
+
+    #[test]
+    fn exhaustion_reason_distinguishable_from_invalid() {
+        let err = anyhow::anyhow!("pg timeout");
+        let reason = storage_exhaustion_reason(3, &err);
+        // Storage reasons start with "storage: " — invalid reasons from
+        // parse_order_created start with "invalid JSON: …" or similar.
+        assert!(reason.starts_with("storage: "));
     }
 }

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use event_processor::analytics::ClickHouseAnalytics;
 use event_processor::config::Config;
 use event_processor::consume::{handle_message, send_storage_exhausted_to_dlq_and_commit, KafkaIO};
+use event_processor::process::should_dlq;
 use event_processor::http::{router, AppState};
 use event_processor::orders::PostgresOrders;
 use event_processor::telemetry::init_propagation;
@@ -99,7 +100,7 @@ async fn main() -> anyhow::Result<()> {
                             Ok(()) => break,
                             Err(err) => {
                                 attempt += 1;
-                                if attempt >= max_retries {
+                                if should_dlq(attempt, max_retries) {
                                     tracing::error!(
                                         error = %err,
                                         attempt,
