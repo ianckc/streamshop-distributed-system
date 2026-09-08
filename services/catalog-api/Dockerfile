@@ -24,4 +24,4 @@ EXPOSE 3001
 
 USER node
 
-CMD ["node", "dist/server.js"]
+CMD ["node", "--import", "./dist/instrumentation.js", "dist/server.js"]

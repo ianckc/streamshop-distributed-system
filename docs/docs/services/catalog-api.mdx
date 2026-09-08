@@ -179,7 +179,7 @@ npm start
 
 `MONGODB_URI`, `REDIS_URL`, and `S3_*` in `.env.example` point at `localhost`. Inside Compose the hostnames are `mongo`, `redis`, and `minio`.
 
-`npm start` loads OpenTelemetry via `--import ./src/instrumentation.ts`. Tracing and metrics export to `OTEL_EXPORTER_OTLP_ENDPOINT` when the [observability](../architecture/observability) Compose profile is running; otherwise OpenTelemetry init fails open.
+`npm start` loads OpenTelemetry via `--import ./src/instrumentation.ts`. The Docker image does the same with `--import ./dist/instrumentation.js`. Tracing and metrics export to `OTEL_EXPORTER_OTLP_ENDPOINT` when the [observability](../architecture/observability) Compose profile is running; otherwise OpenTelemetry init fails open.
 
 ## Tests
 
