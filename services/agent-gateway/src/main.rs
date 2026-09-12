@@ -22,6 +22,9 @@ async fn main() {
         .await
         .expect("Failed to connect to Redis");
 
+    let llm_model = std::env::var("LLM_MODEL").unwrap_or_else(|_| "qwen3:8b".into());
+    tracing::info!(%llm_model, "LLM model configured");
+
     let state = AppState {
         redis_conn,
         llm_client: reqwest::Client::builder()
@@ -31,6 +34,7 @@ async fn main() {
         llm_base_url: std::env::var("LLM_BASE_URL")
             .unwrap_or_else(|_| "https://api.openai.com".into()),
         llm_api_key: ApiKey::new(std::env::var("LLM_API_KEY").expect("LLM_API_KEY must be set")),
+        llm_model,
     };
 
     let app = gateway::router::app(state);

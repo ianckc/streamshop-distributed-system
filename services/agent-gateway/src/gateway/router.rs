@@ -34,6 +34,8 @@ pub struct AppState {
     pub llm_client: reqwest::Client,
     pub llm_base_url: String,
     pub llm_api_key: ApiKey,
+    /// Chat-completions model id (from `LLM_MODEL`, overridable per request later).
+    pub llm_model: String,
 }
 
 pub fn app(state: AppState) -> Router {

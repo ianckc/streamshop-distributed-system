@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use tokio::sync::mpsc;
 
 use crate::AppState;
+use crate::agent::tools::phase_a_tool_schemas;
 use crate::streaming::events::AgentEvent;
 
 pub(crate) struct ToolCallDirective {
@@ -16,14 +17,17 @@ pub(crate) async fn stream_llm_response(
     messages: &[serde_json::Value],
     tx: &mpsc::Sender<AgentEvent>,
 ) -> Result<(Vec<ToolCallDirective>, Option<String>), Box<dyn std::error::Error + Send + Sync>> {
+    let tools = phase_a_tool_schemas();
     let response = state
         .llm_client
         .post(format!("{}/v1/chat/completions", state.llm_base_url))
         .bearer_auth(state.llm_api_key.api_key())
         .timeout(std::time::Duration::from_secs(90))
         .json(&serde_json::json!({
-            "model": "qwen3:8b",
+            "model": state.llm_model,
             "messages": messages,
+            "tools": tools,
+            "tool_choice": "auto",
             "stream": true
         }))
         .send()

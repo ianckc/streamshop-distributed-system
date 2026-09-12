@@ -17,6 +17,8 @@ cp .env.example .env
 cargo run
 ```
 
+`LLM_MODEL` selects the chat-completions model (default `qwen3:8b`). Phase A tool schemas (`get_order`, `get_orders_summary`, `check_service_health`) are advertised to the LLM; HTTP handlers land in A4.
+
 Default listen port is **3010** (StreamShop Traefik owns host `:8080`).
 
 ## Compose / Traefik
