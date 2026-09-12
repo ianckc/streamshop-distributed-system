@@ -19,7 +19,7 @@ pub(crate) async fn stream_llm_response(
 ) -> Result<(Vec<ToolCallDirective>, Option<String>), Box<dyn std::error::Error + Send + Sync>> {
     let tools = phase_a_tool_schemas();
     let response = state
-        .llm_client
+        .http_client
         .post(format!("{}/v1/chat/completions", state.llm_base_url))
         .bearer_auth(state.llm_api_key.api_key())
         .timeout(std::time::Duration::from_secs(90))

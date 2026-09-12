@@ -60,12 +60,13 @@ pub async fn orchestrate_turn(
             let tool_name = tc.tool_name.clone();
             let arguments = tc.arguments.clone();
             let tx_clone = tx.clone();
+            let state_clone = state.clone();
             let token = CancellationToken::new();
             let token_child = token.clone();
 
             let handle = tokio::spawn(async move {
                 tokio::select! {
-                    result = execute_tool(&tool_name, &arguments) => {
+                    result = crate::agent::tools::execute_tool(&state_clone, &tool_name, &arguments) => {
                         let _ = tx_clone.send(AgentEvent::ToolResult {
                             tool_name: tool_name.clone(),
                             result: result.clone(),
@@ -120,9 +121,4 @@ pub async fn orchestrate_turn(
 
     redis_store::save_context(&state, &request.session_id, &messages).await?;
     Ok(())
-}
-
-/// Stub: replace with your tool registry lookup and execution logic.
-async fn execute_tool(_name: &str, _args: &serde_json::Value) -> serde_json::Value {
-    serde_json::json!({ "status": "not_implemented" })
 }

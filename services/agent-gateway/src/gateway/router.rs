@@ -29,13 +29,23 @@ impl fmt::Debug for ApiKey {
 }
 
 #[derive(Clone)]
+pub struct StreamShopConfig {
+    pub analytics_url: String,
+    pub order_url: String,
+    pub catalog_url: String,
+    pub event_processor_url: String,
+}
+
+#[derive(Clone)]
 pub struct AppState {
     pub redis_conn: MultiplexedConnection,
-    pub llm_client: reqwest::Client,
+    /// Shared outbound HTTP client (LLM + tool calls).
+    pub http_client: reqwest::Client,
     pub llm_base_url: String,
     pub llm_api_key: ApiKey,
-    /// Chat-completions model id (from `LLM_MODEL`, overridable per request later).
+    /// Chat-completions model id (from `LLM_MODEL`).
     pub llm_model: String,
+    pub streamshop: StreamShopConfig,
 }
 
 pub fn app(state: AppState) -> Router {
