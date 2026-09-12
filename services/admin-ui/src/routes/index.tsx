@@ -150,7 +150,7 @@ function ChatPage() {
 
   return (
     <main className="page-wrap flex min-h-[calc(100vh-8rem)] flex-col px-4 pb-8 pt-10">
-      <section className="island-shell rise-in relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] px-5 py-6 sm:px-8 sm:py-8">
+      <section className="island-shell rise-in relative flex min-h-0 flex-1 flex-col overflow-x-hidden rounded-[2rem] px-5 py-6 sm:px-8 sm:py-8">
         <div className="pointer-events-none absolute -left-20 -top-24 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(79,184,178,0.28),transparent_66%)]" />
         <div className="pointer-events-none absolute -bottom-24 -right-16 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(47,106,74,0.16),transparent_66%)]" />
 
