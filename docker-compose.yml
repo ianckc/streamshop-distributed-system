@@ -363,6 +363,45 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  agent-gateway:
+    build:
+      context: ./services/agent-gateway
+      dockerfile: Dockerfile
+    container_name: streamshop-agent-gateway
+    ports:
+      - "${AGENT_GATEWAY_PORT:-3010}:${AGENT_GATEWAY_PORT:-3010}"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.agent-gateway.rule=PathPrefix(`/v1/agent`)
+      - traefik.http.routers.agent-gateway.entrypoints=web
+      - traefik.http.services.agent-gateway.loadbalancer.server.port=${AGENT_GATEWAY_PORT:-3010}
+    env_file:
+      - path: ./services/agent-gateway/.env
+        required: false
+    environment:
+      PORT: ${AGENT_GATEWAY_PORT:-3010}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      LLM_API_KEY: ${LLM_API_KEY:-ollama}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
+      LLM_MODEL: ${LLM_MODEL:-qwen3:8b}
+      STREAMSHOP_ANALYTICS_URL: ${STREAMSHOP_ANALYTICS_URL:-http://analytics-api:3003}
+      STREAMSHOP_ORDER_URL: ${STREAMSHOP_ORDER_URL:-http://order-api:3002}
+      STREAMSHOP_CATALOG_URL: ${STREAMSHOP_CATALOG_URL:-http://catalog-api-1:3001}
+      STREAMSHOP_EVENT_PROCESSOR_URL: ${STREAMSHOP_EVENT_PROCESSOR_URL:-http://event-processor:3004}
+      RUST_LOG: ${AGENT_GATEWAY_RUST_LOG:-info}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${PORT}/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
   catalog-api-1:
     <<: *catalog-api
     container_name: streamshop-catalog-api-1
