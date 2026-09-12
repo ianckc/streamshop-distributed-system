@@ -210,10 +210,20 @@ function ChatPage() {
                       : 'border border-[var(--line)] bg-[var(--surface-strong)] text-[var(--sea-ink)]'
                 }`}
               >
-                {m.content || (m.streaming ? '…' : '')}
-                {m.streaming && m.content ? (
-                  <span className="ml-0.5 inline-block animate-pulse">▍</span>
-                ) : null}
+                {m.streaming && !m.content ? (
+                  <span className="typing-dots" aria-label="Agent is replying">
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                ) : (
+                  <>
+                    {m.content}
+                    {m.streaming ? (
+                      <span className="ml-0.5 inline-block animate-pulse">▍</span>
+                    ) : null}
+                  </>
+                )}
               </div>
             </div>
           ))}
