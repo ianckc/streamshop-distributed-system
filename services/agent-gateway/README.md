@@ -47,7 +47,7 @@ With `make up`, Traefik routes:
 curl -s http://localhost:8080/v1/agent/stream -o /dev/null -w '%{http_code}\n' \
   -H 'Content-Type: application/json' \
   -d '{"session_id":"smoke","message":"ping"}'
-# Expect 200 once LLM + Redis are reachable (tools still stubbed until A4)
+# Or from repo root: make agent-smoke
 ```
 
 LLM defaults assume Ollama on the host (`host.docker.internal:11434`). Override `LLM_*` in root `.env` or `services/agent-gateway/.env`.
