@@ -40,6 +40,7 @@ With `make up`, Traefik routes:
 | URL | Target |
 |-----|--------|
 | `http://localhost:8080/v1/agent/stream` | SSE agent turns |
+| `http://localhost:8080/admin/` | Admin chat UI (admin-ui) |
 | `http://localhost:3010/health` | Direct health (debug port) |
 
 ```bash
