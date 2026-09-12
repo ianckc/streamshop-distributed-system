@@ -3,6 +3,7 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::AppState;
+use crate::agent::prompt::{ensure_operator_system_prompt, strip_system_messages};
 use crate::state::redis_store;
 use crate::streaming::events::{AgentEvent, AgentRequest};
 
@@ -19,6 +20,7 @@ pub async fn orchestrate_turn(
         "role": "user",
         "content": request.message
     }));
+    ensure_operator_system_prompt(&mut messages);
 
     loop {
         turn_number += 1;
@@ -119,6 +121,7 @@ pub async fn orchestrate_turn(
         .await?;
     }
 
-    redis_store::save_context(&state, &request.session_id, &messages).await?;
+    let to_persist = strip_system_messages(&messages);
+    redis_store::save_context(&state, &request.session_id, &to_persist).await?;
     Ok(())
 }

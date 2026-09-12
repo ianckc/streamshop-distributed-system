@@ -29,6 +29,8 @@ Phase A tools (HTTP against StreamShop):
 
 Base URLs come from `STREAMSHOP_*_URL` (Compose DNS in Docker; `127.0.0.1` ports for local `cargo run`).
 
+Each turn injects an **operator system prompt** (read-only Phase A limits: no outbox/DLQ/lag/breaker claims). The prompt is not stored in Redis; it is re-applied every turn.
+
 Default listen port is **3010** (StreamShop Traefik owns host `:8080`).
 
 ## Compose / Traefik
