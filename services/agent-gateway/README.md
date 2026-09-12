@@ -1,0 +1,53 @@
+# agent-gateway
+
+Rust SSE agent gateway (ops / SRE copilot). Vendored from `rust-ai-agent-gateway/` for StreamShop.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Liveness |
+| POST | `/v1/agent/stream` | SSE agent turn (`session_id` + `message`) |
+
+## Local development
+
+```bash
+cp .env.example .env
+# Point REDIS_URL / LLM_* at your local Redis and Ollama (or other provider)
+cargo run
+```
+
+`LLM_MODEL` selects the chat-completions model (default `qwen3:8b`).
+
+Phase A tools (HTTP against StreamShop):
+
+| Tool | Upstream |
+|------|----------|
+| `get_order` | `GET {STREAMSHOP_ANALYTICS_URL}/api/analytics/orders/{id}` |
+| `get_orders_summary` | `GET …/api/analytics/orders/summary` |
+| `check_service_health` | `GET {service}/ready` |
+
+Base URLs come from `STREAMSHOP_*_URL` (Compose DNS in Docker; `127.0.0.1` ports for local `cargo run`).
+
+Each turn injects an **operator system prompt** (read-only Phase A limits: no outbox/DLQ/lag/breaker claims). The prompt is not stored in Redis; it is re-applied every turn.
+
+Default listen port is **3010** (StreamShop Traefik owns host `:8080`).
+
+## Compose / Traefik
+
+With `make up`, Traefik routes:
+
+| URL | Target |
+|-----|--------|
+| `http://localhost:8080/v1/agent/stream` | SSE agent turns |
+| `http://localhost:8080/admin/` | Admin chat UI (admin-ui) |
+| `http://localhost:3010/health` | Direct health (debug port) |
+
+```bash
+curl -s http://localhost:8080/v1/agent/stream -o /dev/null -w '%{http_code}\n' \
+  -H 'Content-Type: application/json' \
+  -d '{"session_id":"smoke","message":"ping"}'
+# Or from repo root: make agent-smoke
+```
+
+LLM defaults assume Ollama on the host (`host.docker.internal:11434`). Override `LLM_*` in root `.env` or `services/agent-gateway/.env`.

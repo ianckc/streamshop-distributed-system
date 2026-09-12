@@ -8,7 +8,7 @@ make up && make seed && make smoke
 
 That starts the stack (waits until it is healthy), loads sample catalog data and product images, then walks the happy path: list products → place an order → wait until it is `processed` → check analytics.
 
-**Documentation:** [http://localhost:8080/docs/](http://localhost:8080/docs/) after `make up`, or `cd docs && npm start` on [http://localhost:3100/docs/](http://localhost:3100/docs/). Roadmap: [PLAN.md](./PLAN.md).
+**Documentation:** [http://localhost:8080/docs/](http://localhost:8080/docs/) after `make up`, or `cd docs && npm start` on [http://localhost:3100/docs/](http://localhost:3100/docs/). Roadmap: [PLAN.md](./PLAN.md). Ops agent: [AI-AGENT-USE-CASES.md](./AI-AGENT-USE-CASES.md) · UI [http://localhost:8080/admin/](http://localhost:8080/admin/).
 
 ## 30-second walkthrough
 
@@ -19,6 +19,7 @@ With the stack up:
 3. **Watch the event** — [Redpanda Console](http://localhost:8082) → topic `orders.events`
 4. **See it processed** — Postgres `orders.status` becomes `processed` (event-processor)
 5. **Read analytics** — [http://localhost:8080/api/analytics/orders/summary](http://localhost:8080/api/analytics/orders/summary)
+6. **Ask the ops agent** — [http://localhost:8080/admin/](http://localhost:8080/admin/) (or `make agent-smoke`; needs `LLM_*` in `.env`)
 
 ## Make targets
 
@@ -27,10 +28,11 @@ With the stack up:
 | `make up` | `docker compose up --build -d --wait` |
 | `make seed` | Topics, catalog upsert, sample MinIO images, Redis flush |
 | `make smoke` | End-to-end check through Traefik (`:8080`) |
+| `make agent-smoke` | Ops agent: gateway health, `/admin/`, one SSE turn |
 | `make logs` | `docker compose logs -f` |
 | `make down` | `docker compose down` |
 
-Traefik is the HTTP entrypoint on **:8080** (APIs and docs at `/docs/`). Other consoles: Traefik [dashboard](http://localhost:8081), [Redis Insight](http://localhost:5540), [MinIO](http://localhost:9001), [Redpanda Console](http://localhost:8082). Redpanda Kafka API: `localhost:19092`. ClickHouse HTTP: `localhost:8123`.
+Traefik is the HTTP entrypoint on **:8080** (APIs, docs at `/docs/`, admin agent at `/admin/`). Other consoles: Traefik [dashboard](http://localhost:8081), [Redis Insight](http://localhost:5540), [MinIO](http://localhost:9001), [Redpanda Console](http://localhost:8082). Redpanda Kafka API: `localhost:19092`. ClickHouse HTTP: `localhost:8123`.
 
 ### Observability stack (optional)
 
