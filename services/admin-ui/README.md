@@ -22,3 +22,11 @@ Requires StreamShop Traefik (or agent-gateway) on `:8080` for SSE.
 | http://localhost:8080/v1/agent/stream | SSE (agent-gateway) |
 
 Tool call/result events render inline as monospace lines in the transcript.
+
+## How assets are served
+
+The image runs **nginx on :80** (Traefik target) in front of **srvx on :3020** (SSR):
+
+- `/admin/assets/*` → files from `dist/client/assets/` (avoids an srvx + `base: /admin/` 404)
+- `/admin` → proxied to TanStack Start for HTML/SSR
+- `/health` → nginx liveness for Compose

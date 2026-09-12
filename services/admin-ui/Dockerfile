@@ -10,21 +10,28 @@ ARG ADMIN_UI_BASE=/admin/
 ENV ADMIN_UI_BASE=$ADMIN_UI_BASE
 RUN npm run build
 
-# Runtime — TanStack Start (srvx) + static client assets
+# Runtime — nginx (assets + /health) fronts TanStack Start (srvx) for SSR
 FROM node:22-bookworm-slim
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends nginx wget ca-certificates \
+  && rm -rf /var/lib/apt/lists/* \
+  && rm -f /etc/nginx/sites-enabled/default
 
 WORKDIR /app
 ENV NODE_ENV=production
-ENV PORT=3020
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
-EXPOSE 3020
+EXPOSE 80
 
-HEALTHCHECK --interval=10s --timeout=3s --retries=5 --start-period=15s \
-  CMD node -e "fetch('http://127.0.0.1:3020/admin/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+HEALTHCHECK --interval=10s --timeout=3s --retries=5 --start-period=25s \
+  CMD wget -qO- http://127.0.0.1/health || exit 1
 
-CMD ["npx", "srvx", "serve", "--prod", "--host", "0.0.0.0", "--port", "3020", "--static", "./dist/client", "--entry", "./dist/server/server.js"]
+CMD ["/docker-entrypoint.sh"]
