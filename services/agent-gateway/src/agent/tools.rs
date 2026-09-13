@@ -52,6 +52,18 @@ pub fn phase_a_tool_schemas() -> Vec<serde_json::Value> {
                 }
             }
         }),
+        serde_json::json!({
+            "type": "function",
+            "function": {
+                "name": "list_products",
+                "description": "List StreamShop catalog products from catalog-api. Returns id, name, price_pence, attributes, and optional image_url for each product.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                }
+            }
+        }),
     ]
 }
 
@@ -67,6 +79,7 @@ pub async fn execute_tool(
         "get_order" => get_order(state, args).await,
         "get_orders_summary" => get_orders_summary(state).await,
         "check_service_health" => check_service_health(state, args).await,
+        "list_products" => list_products(state).await,
         other => serde_json::json!({
             "ok": false,
             "error": format!("unknown tool: {other}")
@@ -95,6 +108,14 @@ async fn get_orders_summary(state: &AppState) -> serde_json::Value {
     let url = format!(
         "{}/api/analytics/orders/summary",
         state.streamshop.analytics_url.trim_end_matches('/')
+    );
+    http_get(state, &url).await
+}
+
+async fn list_products(state: &AppState) -> serde_json::Value {
+    let url = format!(
+        "{}/api/catalog/products",
+        state.streamshop.catalog_url.trim_end_matches('/')
     );
     http_get(state, &url).await
 }
