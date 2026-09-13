@@ -80,14 +80,33 @@ pub fn tool_schemas_for(persona: Persona) -> Vec<serde_json::Value> {
     }
 }
 
+/// Whether `name` may be executed for this persona.
+pub fn tool_allowed_for(persona: Persona, name: &str) -> bool {
+    match persona {
+        Persona::Operator => matches!(
+            name,
+            "get_order" | "get_orders_summary" | "check_service_health"
+        ),
+        Persona::Shopper => matches!(name, "list_products"),
+    }
+}
+
 const TOOL_HTTP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
-/// Dispatch a Phase A tool call to StreamShop HTTP APIs.
+/// Dispatch a tool call to StreamShop HTTP APIs, enforcing persona allowlists.
 pub async fn execute_tool(
     state: &AppState,
+    persona: Persona,
     name: &str,
     args: &serde_json::Value,
 ) -> serde_json::Value {
+    if !tool_allowed_for(persona, name) {
+        return serde_json::json!({
+            "ok": false,
+            "error": format!("tool not allowed for persona: {name}")
+        });
+    }
+
     match name {
         "get_order" => get_order(state, args).await,
         "get_orders_summary" => get_orders_summary(state).await,

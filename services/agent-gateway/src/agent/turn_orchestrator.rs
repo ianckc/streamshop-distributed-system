@@ -68,12 +68,18 @@ pub async fn orchestrate_turn(
             let arguments = tc.arguments.clone();
             let tx_clone = tx.clone();
             let state_clone = state.clone();
+            let persona = request.persona;
             let token = CancellationToken::new();
             let token_child = token.clone();
 
             let handle = tokio::spawn(async move {
                 tokio::select! {
-                    result = crate::agent::tools::execute_tool(&state_clone, &tool_name, &arguments) => {
+                    result = crate::agent::tools::execute_tool(
+                        &state_clone,
+                        persona,
+                        &tool_name,
+                        &arguments,
+                    ) => {
                         let _ = tx_clone.send(AgentEvent::ToolResult {
                             tool_name: tool_name.clone(),
                             result: result.clone(),
