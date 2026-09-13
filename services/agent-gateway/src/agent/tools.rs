@@ -1,7 +1,8 @@
 use crate::AppState;
+use crate::streaming::events::Persona;
 
-/// OpenAI-compatible tool definitions advertised to the LLM (Phase A).
-pub fn phase_a_tool_schemas() -> Vec<serde_json::Value> {
+/// Ops / SRE tools (Phase A).
+pub fn operator_tool_schemas() -> Vec<serde_json::Value> {
     vec![
         serde_json::json!({
             "type": "function",
@@ -52,19 +53,31 @@ pub fn phase_a_tool_schemas() -> Vec<serde_json::Value> {
                 }
             }
         }),
-        serde_json::json!({
-            "type": "function",
-            "function": {
-                "name": "list_products",
-                "description": "List StreamShop catalog products from catalog-api. Returns id, name, price_pence, attributes, and optional image_url for each product.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {},
-                    "additionalProperties": false
-                }
-            }
-        }),
     ]
+}
+
+/// Shopper catalog tools.
+pub fn shopper_tool_schemas() -> Vec<serde_json::Value> {
+    vec![serde_json::json!({
+        "type": "function",
+        "function": {
+            "name": "list_products",
+            "description": "List StreamShop catalog products from catalog-api. Returns id, name, price_pence, attributes, and optional image_url for each product.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        }
+    })]
+}
+
+/// Tool schemas advertised to the LLM for this persona.
+pub fn tool_schemas_for(persona: Persona) -> Vec<serde_json::Value> {
+    match persona {
+        Persona::Operator => operator_tool_schemas(),
+        Persona::Shopper => shopper_tool_schemas(),
+    }
 }
 
 const TOOL_HTTP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);

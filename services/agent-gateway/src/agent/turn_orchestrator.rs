@@ -39,8 +39,13 @@ pub async fn orchestrate_turn(
         })
         .await?;
 
-        let (tool_calls, finish_reason) =
-            crate::streaming::llm_stream::stream_llm_response(&state, &messages, &tx).await?;
+        let (tool_calls, finish_reason) = crate::streaming::llm_stream::stream_llm_response(
+            &state,
+            &messages,
+            request.persona,
+            &tx,
+        )
+        .await?;
 
         if tool_calls.is_empty() {
             tx.send(AgentEvent::TurnEnd {
