@@ -1,3 +1,5 @@
+use crate::streaming::events::Persona;
+
 /// Operator (ops / SRE) persona for Phase A — read-only tools only.
 pub const OPERATOR_SYSTEM_PROMPT: &str = r#"You are the StreamShop Ops / SRE copilot.
 
@@ -37,17 +39,14 @@ Help shoppers learn about products in the StreamShop catalog. You answer questio
 5. If `list_products` returns `ok: false` or a non-2xx `status`, say the catalog is unavailable and do not invent a substitute catalog.
 6. Be concise and helpful: short answers with clear product names and prices."#;
 
-/// Ensure `messages` starts with the current operator system prompt.
+/// Ensure `messages` starts with the system prompt for `persona`.
 /// Replaces any leading `system` messages so prompt updates apply mid-session.
-pub fn ensure_operator_system_prompt(messages: &mut Vec<serde_json::Value>) {
-    inject_system_prompt(messages, OPERATOR_SYSTEM_PROMPT);
-}
-
-/// Ensure `messages` starts with the current shopper system prompt.
-/// Replaces any leading `system` messages so prompt updates apply mid-session.
-#[allow(dead_code)] // wired when persona routing is added
-pub fn ensure_shopper_system_prompt(messages: &mut Vec<serde_json::Value>) {
-    inject_system_prompt(messages, SHOPPER_SYSTEM_PROMPT);
+pub fn ensure_system_prompt(messages: &mut Vec<serde_json::Value>, persona: Persona) {
+    let content = match persona {
+        Persona::Operator => OPERATOR_SYSTEM_PROMPT,
+        Persona::Shopper => SHOPPER_SYSTEM_PROMPT,
+    };
+    inject_system_prompt(messages, content);
 }
 
 fn inject_system_prompt(messages: &mut Vec<serde_json::Value>, content: &str) {

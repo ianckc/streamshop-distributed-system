@@ -3,7 +3,7 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::AppState;
-use crate::agent::prompt::{ensure_operator_system_prompt, strip_system_messages};
+use crate::agent::prompt::{ensure_system_prompt, strip_system_messages};
 use crate::state::redis_store;
 use crate::streaming::events::{AgentEvent, AgentRequest};
 
@@ -20,7 +20,7 @@ pub async fn orchestrate_turn(
         "role": "user",
         "content": request.message
     }));
-    ensure_operator_system_prompt(&mut messages);
+    ensure_system_prompt(&mut messages, request.persona);
 
     loop {
         turn_number += 1;
