@@ -427,6 +427,33 @@ services:
       start_period: 25s
     restart: unless-stopped
 
+  storefront-ui:
+    build:
+      context: ./services/storefront-ui
+      dockerfile: Dockerfile
+      args:
+        STOREFRONT_UI_BASE: /
+    container_name: streamshop-storefront-ui
+    ports:
+      - "${STOREFRONT_UI_PORT:-3030}:80"
+    labels:
+      - traefik.enable=true
+      # Lowest priority so /admin, /api/*, /v1/agent, /docs keep their routers.
+      - traefik.http.routers.storefront-ui.rule=PathPrefix(`/`)
+      - traefik.http.routers.storefront-ui.entrypoints=web
+      - traefik.http.routers.storefront-ui.priority=1
+      - traefik.http.services.storefront-ui.loadbalancer.server.port=80
+    depends_on:
+      agent-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 25s
+    restart: unless-stopped
+
   catalog-api-1:
     <<: *catalog-api
     container_name: streamshop-catalog-api-1
