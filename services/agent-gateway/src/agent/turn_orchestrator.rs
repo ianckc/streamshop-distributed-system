@@ -3,7 +3,7 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::AppState;
-use crate::agent::prompt::{ensure_operator_system_prompt, strip_system_messages};
+use crate::agent::prompt::{ensure_system_prompt, strip_system_messages};
 use crate::state::redis_store;
 use crate::streaming::events::{AgentEvent, AgentRequest};
 
@@ -20,7 +20,7 @@ pub async fn orchestrate_turn(
         "role": "user",
         "content": request.message
     }));
-    ensure_operator_system_prompt(&mut messages);
+    ensure_system_prompt(&mut messages, request.persona);
 
     loop {
         turn_number += 1;
@@ -39,8 +39,13 @@ pub async fn orchestrate_turn(
         })
         .await?;
 
-        let (tool_calls, finish_reason) =
-            crate::streaming::llm_stream::stream_llm_response(&state, &messages, &tx).await?;
+        let (tool_calls, finish_reason) = crate::streaming::llm_stream::stream_llm_response(
+            &state,
+            &messages,
+            request.persona,
+            &tx,
+        )
+        .await?;
 
         if tool_calls.is_empty() {
             tx.send(AgentEvent::TurnEnd {
@@ -63,12 +68,18 @@ pub async fn orchestrate_turn(
             let arguments = tc.arguments.clone();
             let tx_clone = tx.clone();
             let state_clone = state.clone();
+            let persona = request.persona;
             let token = CancellationToken::new();
             let token_child = token.clone();
 
             let handle = tokio::spawn(async move {
                 tokio::select! {
-                    result = crate::agent::tools::execute_tool(&state_clone, &tool_name, &arguments) => {
+                    result = crate::agent::tools::execute_tool(
+                        &state_clone,
+                        persona,
+                        &tool_name,
+                        &arguments,
+                    ) => {
                         let _ = tx_clone.send(AgentEvent::ToolResult {
                             tool_name: tool_name.clone(),
                             result: result.clone(),

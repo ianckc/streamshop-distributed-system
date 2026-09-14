@@ -1,11 +1,23 @@
 use serde::{Deserialize, Serialize};
 
+/// Which agent persona (and later tool set) this turn uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Persona {
+    #[default]
+    Operator,
+    Shopper,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentRequest {
     pub session_id: String,
     pub message: String,
     #[serde(default)]
     pub model: Option<String>,
+    /// Defaults to `operator` when omitted (admin / Phase A clients).
+    #[serde(default)]
+    pub persona: Persona,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,7 +1,8 @@
 use crate::AppState;
+use crate::streaming::events::Persona;
 
-/// OpenAI-compatible tool definitions advertised to the LLM (Phase A).
-pub fn phase_a_tool_schemas() -> Vec<serde_json::Value> {
+/// Ops / SRE tools (Phase A).
+pub fn operator_tool_schemas() -> Vec<serde_json::Value> {
     vec![
         serde_json::json!({
             "type": "function",
@@ -55,18 +56,62 @@ pub fn phase_a_tool_schemas() -> Vec<serde_json::Value> {
     ]
 }
 
+/// Shopper catalog tools.
+pub fn shopper_tool_schemas() -> Vec<serde_json::Value> {
+    vec![serde_json::json!({
+        "type": "function",
+        "function": {
+            "name": "list_products",
+            "description": "List StreamShop catalog products from catalog-api. Returns id, name, price_pence, attributes, and optional image_url for each product.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        }
+    })]
+}
+
+/// Tool schemas advertised to the LLM for this persona.
+pub fn tool_schemas_for(persona: Persona) -> Vec<serde_json::Value> {
+    match persona {
+        Persona::Operator => operator_tool_schemas(),
+        Persona::Shopper => shopper_tool_schemas(),
+    }
+}
+
+/// Whether `name` may be executed for this persona.
+pub fn tool_allowed_for(persona: Persona, name: &str) -> bool {
+    match persona {
+        Persona::Operator => matches!(
+            name,
+            "get_order" | "get_orders_summary" | "check_service_health"
+        ),
+        Persona::Shopper => matches!(name, "list_products"),
+    }
+}
+
 const TOOL_HTTP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
-/// Dispatch a Phase A tool call to StreamShop HTTP APIs.
+/// Dispatch a tool call to StreamShop HTTP APIs, enforcing persona allowlists.
 pub async fn execute_tool(
     state: &AppState,
+    persona: Persona,
     name: &str,
     args: &serde_json::Value,
 ) -> serde_json::Value {
+    if !tool_allowed_for(persona, name) {
+        return serde_json::json!({
+            "ok": false,
+            "error": format!("tool not allowed for persona: {name}")
+        });
+    }
+
     match name {
         "get_order" => get_order(state, args).await,
         "get_orders_summary" => get_orders_summary(state).await,
         "check_service_health" => check_service_health(state, args).await,
+        "list_products" => list_products(state).await,
         other => serde_json::json!({
             "ok": false,
             "error": format!("unknown tool: {other}")
@@ -95,6 +140,14 @@ async fn get_orders_summary(state: &AppState) -> serde_json::Value {
     let url = format!(
         "{}/api/analytics/orders/summary",
         state.streamshop.analytics_url.trim_end_matches('/')
+    );
+    http_get(state, &url).await
+}
+
+async fn list_products(state: &AppState) -> serde_json::Value {
+    let url = format!(
+        "{}/api/catalog/products",
+        state.streamshop.catalog_url.trim_end_matches('/')
     );
     http_get(state, &url).await
 }

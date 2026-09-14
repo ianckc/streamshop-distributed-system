@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use tokio::sync::mpsc;
 
 use crate::AppState;
-use crate::agent::tools::phase_a_tool_schemas;
-use crate::streaming::events::AgentEvent;
+use crate::agent::tools::tool_schemas_for;
+use crate::streaming::events::{AgentEvent, Persona};
 
 pub(crate) struct ToolCallDirective {
     pub tool_name: String,
@@ -15,9 +15,10 @@ pub(crate) struct ToolCallDirective {
 pub(crate) async fn stream_llm_response(
     state: &AppState,
     messages: &[serde_json::Value],
+    persona: Persona,
     tx: &mpsc::Sender<AgentEvent>,
 ) -> Result<(Vec<ToolCallDirective>, Option<String>), Box<dyn std::error::Error + Send + Sync>> {
-    let tools = phase_a_tool_schemas();
+    let tools = tool_schemas_for(persona);
     let response = state
         .http_client
         .post(format!("{}/v1/chat/completions", state.llm_base_url))
