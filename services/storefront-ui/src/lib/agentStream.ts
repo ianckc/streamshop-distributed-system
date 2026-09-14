@@ -2,8 +2,6 @@ export type AgentRequest = {
   session_id: string
   message: string
   model?: string
-  /** Agent persona; storefront chat uses shopper tools/prompt. */
-  persona: 'operator' | 'shopper'
 }
 
 export type AgentEvent =
@@ -41,6 +39,7 @@ function parseAgentEvent(data: string): AgentEvent | null {
 
 /**
  * POST to the gateway SSE endpoint and invoke onEvent for each parsed frame.
+ * Storefront always uses the shopper persona (catalog tools only).
  * Uses fetch + ReadableStream because EventSource only supports GET.
  */
 export async function streamAgent(options: StreamAgentOptions): Promise<void> {
@@ -49,7 +48,7 @@ export async function streamAgent(options: StreamAgentOptions): Promise<void> {
   const response = await fetch('/v1/agent/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-    body: JSON.stringify(request),
+    body: JSON.stringify({ ...request, persona: 'shopper' }),
     signal,
   })
 

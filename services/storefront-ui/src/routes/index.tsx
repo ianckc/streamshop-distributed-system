@@ -129,7 +129,7 @@ function ChatPage() {
 
     try {
       await streamAgent({
-        request: { session_id: sid, message, persona: 'shopper' },
+        request: { session_id: sid, message },
         signal: controller.signal,
         onEvent: (event) => handleEvent(assistantId, event),
       })
