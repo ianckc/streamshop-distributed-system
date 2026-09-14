@@ -2,6 +2,8 @@ export type AgentRequest = {
   session_id: string
   message: string
   model?: string
+  /** Agent persona; admin chat always uses operator tools/prompt. */
+  persona: 'operator' | 'shopper'
 }
 
 export type AgentEvent =
