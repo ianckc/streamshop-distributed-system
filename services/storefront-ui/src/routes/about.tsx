@@ -13,10 +13,10 @@ function About() {
           Your shop, online
         </h1>
         <p className="m-0 max-w-3xl text-base leading-8 text-[var(--sea-ink-soft)]">
-          Public storefront for StreamShop. Today this is the app shell — chat
-          with the shopping assistant comes next, then browse, purchase, and
-          accounts. Served at <code>/</code> via Traefik; the agent gateway is at{' '}
-          <code>/v1/agent</code>.
+          Public storefront for StreamShop. Chat with the shopping assistant
+          about catalog products (browse, purchase, and accounts come later).
+          Served at <code>/</code> via Traefik; SSE calls go to{' '}
+          <code>/v1/agent/stream</code>.
         </p>
       </section>
     </main>
