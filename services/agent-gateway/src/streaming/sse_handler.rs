@@ -30,6 +30,12 @@ pub async fn handle_stream(
         ));
     }
 
+    tracing::info!(
+        session_id = %request.session_id,
+        persona = ?request.persona,
+        "agent stream turn"
+    );
+
     let (tx, rx) = mpsc::channel::<AgentEvent>(64);
 
     tokio::spawn(async move {
