@@ -4,7 +4,7 @@ import { streamAgent, type AgentEvent } from '#/lib/agentStream'
 
 export const Route = createFileRoute('/')({ component: ChatPage })
 
-type ChatRole = 'user' | 'assistant' | 'tool'
+type ChatRole = 'user' | 'assistant' | 'status'
 
 type ChatMessage = {
   id: string
@@ -15,14 +15,6 @@ type ChatMessage = {
 
 function newSessionId(): string {
   return crypto.randomUUID()
-}
-
-function formatJson(value: unknown): string {
-  try {
-    return JSON.stringify(value, null, 0)
-  } catch {
-    return String(value)
-  }
 }
 
 function ChatPage() {
@@ -60,10 +52,10 @@ function ChatPage() {
     )
   }
 
-  const pushToolLine = (content: string) => {
+  const pushStatus = (content: string) => {
     setMessages((prev) => [
       ...prev,
-      { id: crypto.randomUUID(), role: 'tool', content },
+      { id: crypto.randomUUID(), role: 'status', content },
     ])
   }
 
@@ -73,14 +65,11 @@ function ChatPage() {
         appendToken(assistantId, event.payload.content)
         break
       case 'ToolCall':
-        pushToolLine(
-          `→ ${event.payload.tool_name}(${formatJson(event.payload.arguments)})`,
-        )
+        if (event.payload.tool_name === 'list_products') {
+          pushStatus('Checking the catalog…')
+        }
         break
       case 'ToolResult':
-        pushToolLine(
-          `← ${event.payload.tool_name}: ${formatJson(event.payload.result)}`,
-        )
         break
       case 'Error':
         setError(event.payload.message)
@@ -102,15 +91,18 @@ function ChatPage() {
     )
   }
 
+  const startNewChat = () => {
+    abortRef.current?.abort()
+    setSessionId(newSessionId())
+    setMessages([])
+    setError(null)
+    setStreaming(false)
+    setInput('')
+  }
+
   const send = async () => {
     const message = input.trim()
-    const sid = sessionId.trim()
     if (!message || streaming) return
-
-    if (!sid || !/^[a-zA-Z0-9-]+$/.test(sid)) {
-      setError('session_id must be alphanumeric or hyphens only')
-      return
-    }
 
     setError(null)
     setInput('')
@@ -129,7 +121,7 @@ function ChatPage() {
 
     try {
       await streamAgent({
-        request: { session_id: sid, message },
+        request: { session_id: sessionId, message },
         signal: controller.signal,
         onEvent: (event) => handleEvent(assistantId, event),
       })
@@ -139,7 +131,7 @@ function ChatPage() {
         finishAssistant(assistantId)
         return
       }
-      const msg = err instanceof Error ? err.message : 'Stream failed'
+      const msg = err instanceof Error ? err.message : 'Something went wrong'
       setError(msg)
       finishAssistant(assistantId)
     } finally {
@@ -154,46 +146,30 @@ function ChatPage() {
         <div className="pointer-events-none absolute -left-20 -top-24 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(79,184,178,0.28),transparent_66%)]" />
         <div className="pointer-events-none absolute -bottom-24 -right-16 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(47,106,74,0.16),transparent_66%)]" />
 
-        <header className="relative mb-5 shrink-0">
-          <p className="island-kicker mb-2">Shopping assistant</p>
-          <h1 className="display-title mb-2 text-3xl font-bold tracking-tight text-[var(--sea-ink)] sm:text-4xl">
-            StreamShop
-          </h1>
-          <p className="m-0 max-w-2xl text-sm text-[var(--sea-ink-soft)] sm:text-base">
-            Ask about products in the catalog. Replies stream from the agent
-            gateway; tool calls show inline.
-          </p>
-        </header>
-
-        <label className="relative mb-4 flex shrink-0 flex-col gap-1.5 text-sm">
-          <span className="font-semibold text-[var(--sea-ink)]">Session ID</span>
-          <div className="flex flex-wrap gap-2">
-            <input
-              value={sessionId}
-              onChange={(e) => setSessionId(e.target.value)}
-              disabled={streaming}
-              className="min-w-0 flex-1 rounded-xl border border-[var(--line)] bg-[var(--surface-strong)] px-3 py-2 font-mono text-xs text-[var(--sea-ink)] outline-none focus:border-[var(--lagoon)] sm:text-sm"
-              spellCheck={false}
-            />
-            <button
-              type="button"
-              disabled={streaming}
-              onClick={() => {
-                setSessionId(newSessionId())
-                setMessages([])
-                setError(null)
-              }}
-              className="rounded-xl border border-[var(--chip-line)] bg-[var(--chip-bg)] px-3 py-2 text-xs font-semibold text-[var(--sea-ink)] transition hover:bg-[var(--link-bg-hover)] disabled:opacity-50"
-            >
-              New session
-            </button>
+        <header className="relative mb-6 flex shrink-0 flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="display-title mb-2 text-4xl font-bold tracking-tight text-[var(--sea-ink)] sm:text-5xl">
+              StreamShop
+            </h1>
+            <p className="m-0 max-w-xl text-base text-[var(--sea-ink-soft)]">
+              Find what&apos;s in the catalog — ask about products, prices, and
+              details.
+            </p>
           </div>
-        </label>
+          <button
+            type="button"
+            disabled={streaming && messages.length === 0}
+            onClick={startNewChat}
+            className="shrink-0 rounded-full border border-[var(--chip-line)] bg-[var(--chip-bg)] px-4 py-2 text-sm font-semibold text-[var(--sea-ink)] transition hover:bg-[var(--link-bg-hover)] disabled:opacity-50"
+          >
+            New chat
+          </button>
+        </header>
 
         <div className="relative mb-4 min-h-[14rem] flex-1 space-y-3 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--foam)]/50 p-4">
           {messages.length === 0 && (
             <p className="m-0 text-sm text-[var(--sea-ink-soft)]">
-              Try: “What products do you sell?” or “Anything under £20?”
+              Try asking what we sell, or anything under £20.
             </p>
           )}
           {messages.map((m) => (
@@ -205,13 +181,13 @@ function ChatPage() {
                 className={`max-w-[min(100%,36rem)] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
                   m.role === 'user'
                     ? 'bg-[rgba(79,184,178,0.22)] text-[var(--sea-ink)]'
-                    : m.role === 'tool'
-                      ? 'border border-dashed border-[var(--line)] bg-transparent font-mono text-xs text-[var(--sea-ink-soft)]'
+                    : m.role === 'status'
+                      ? 'bg-transparent text-xs font-medium text-[var(--sea-ink-soft)] italic'
                       : 'border border-[var(--line)] bg-[var(--surface-strong)] text-[var(--sea-ink)]'
                 }`}
               >
                 {m.streaming && !m.content ? (
-                  <span className="typing-dots" aria-label="Agent is replying">
+                  <span className="typing-dots" aria-label="Replying">
                     <span />
                     <span />
                     <span />
@@ -259,7 +235,7 @@ function ChatPage() {
               }}
               rows={3}
               disabled={streaming}
-              placeholder="Ask about products, prices, or attributes…"
+              placeholder="What are you looking for?"
               className="w-full resize-y rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-3.5 py-3 text-sm text-[var(--sea-ink)] outline-none focus:border-[var(--lagoon)] disabled:opacity-60"
             />
           </label>
@@ -278,7 +254,7 @@ function ChatPage() {
                 disabled={!input.trim()}
                 className="rounded-full border border-[rgba(50,143,151,0.3)] bg-[rgba(79,184,178,0.14)] px-5 py-2.5 text-sm font-semibold text-[var(--lagoon-deep)] transition hover:-translate-y-0.5 hover:bg-[rgba(79,184,178,0.24)] disabled:opacity-40 disabled:hover:translate-y-0"
               >
-                Send
+                Ask
               </button>
             )}
           </div>

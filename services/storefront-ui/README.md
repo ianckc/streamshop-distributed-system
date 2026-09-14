@@ -1,7 +1,7 @@
-# StreamShop storefront UI (TanStack Start)
+# StreamShop storefront
 
-Public-facing UI scaffold (eventually browse, purchase, accounts). Served at
-**`/`** behind Traefik. Pattern matches `admin-ui`.
+Public StreamShop UI — shopping assistant chat today; browse, purchase, and
+accounts later. Served at **`/`** behind Traefik.
 
 ## Local development
 
