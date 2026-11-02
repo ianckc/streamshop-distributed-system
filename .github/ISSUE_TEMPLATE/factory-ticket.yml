@@ -48,7 +48,7 @@ body:
       value: |
         - [ ]
         - [ ]
-        - [ ] `make gate SERVICES=<affected>` stays green
+        - [ ] `just gate <affected>` stays green
     validations:
       required: true
 
@@ -68,6 +68,6 @@ body:
       description: What the factory gate (and optional smoke) must prove for this ticket.
       value: |
         - Unit / service tests for every behavior change in Affected services
-        - Optional: `make smoke` if this touches the order → outbox → analytics path
+        - Optional: `just smoke` if this touches the order → outbox → analytics path
     validations:
       required: true

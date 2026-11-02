@@ -17,7 +17,7 @@ pass() {
 }
 
 hint() {
-  echo "hint: make up (LLM: set LLM_* in .env; Ollama on host or Groq/OpenRouter)" >&2
+  echo "hint: just up (LLM: set LLM_* in .env; Ollama on host or Groq/OpenRouter)" >&2
 }
 
 if ! curl -sS -o /dev/null --connect-timeout 2 "$GATEWAY/api/analytics/orders/summary" 2>/dev/null; then

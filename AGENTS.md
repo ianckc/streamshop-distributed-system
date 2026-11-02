@@ -8,7 +8,7 @@ This file is the **contract** for anyone (human or agent) changing this repo via
 
 **StreamShop** — local-first distributed systems showcase: polyglot microservices, event streaming (Redpanda), and multi-store data (Postgres, Mongo, Redis, ClickHouse, MinIO). HTTP entry is Traefik on `:8080`.
 
-Day-to-day stack: `make up && make seed && make smoke`.
+Day-to-day stack: `just up && just seed && just smoke`.
 
 ## Services
 
@@ -44,7 +44,7 @@ File new work with the **Factory ticket** GitHub issue form (`.github/ISSUE_TEMP
 
 1. **Work only from Project tickets** that are **Ready** or **In progress**. Implement only Goal / Acceptance; respect Out of scope. Do not invent scope.
 2. **Every behavior change** ships with tests in the **Affected services** listed on the issue (same bar as that service’s CI).
-3. **`make gate`** must stay green for those services (`make gate SERVICES=order-api,catalog-api`). Red gate = not done.
+3. **`just gate`** must stay green for those services (`just gate order-api,catalog-api`). Red gate = not done.
 4. **CI is the merge inspector** — path-filtered workflows under `.github/workflows/`. Red CI = do not merge.
 5. When a ticket is finished: set Project Status = **Done**, check off acceptance on the issue, append a short note to [`factory/loop-notes.md`](factory/loop-notes.md).
 
@@ -67,7 +67,7 @@ swamp workflow resume run-ticket --run <run-id>
 Implement only GitHub issue #N from Project 10 (Status Ready / In progress).
 Follow AGENTS.md strictly. Do not invent scope.
 When done: set Project Status to Done, check acceptance criteria on the issue,
-append factory/loop-notes.md, and leave make gate green for the affected services.
+append factory/loop-notes.md, and leave just gate green for the affected services.
 ```
 
 ### Agent workflow checklist
@@ -76,15 +76,15 @@ append factory/loop-notes.md, and leave make gate green for the affected service
 2. Read Goal, Affected services, Acceptance, Out of scope, Test plan on the issue body.
 3. Set Status to **In progress** when you start.
 4. Implement **only** what the ticket asks; add or extend tests in those services.
-5. Run the gate: `make gate SERVICES=<affected>` **or** `swamp model method run factory-gate execute`.
-6. For cross-service / pipeline tickets, also run `make smoke` (or `swamp model method run smoke-gate execute`) when the stack is up.
+5. Run the gate: `just gate <affected>` **or** `swamp model method run factory-gate execute`.
+6. For cross-service / pipeline tickets, also run `just smoke` (or `swamp model method run smoke-gate execute`) when the stack is up.
 7. Bookkeeping per hard rule 5.
 
 ## Quality gate
 
-- Local: `make gate` / `make gate SERVICES=…` (see `scripts/factory-gate.sh`)
+- Local: `just gate` / `just gate order-api,catalog-api` (see `scripts/factory-gate.sh`)
 - Swamp model (versioned output): `swamp model method run factory-gate execute`
-- Optional elevated check (Compose up): `make smoke` / `swamp model method run smoke-gate execute`
+- Optional elevated check (Compose up): `just smoke` / `swamp model method run smoke-gate execute`
 - CI: per-service workflows under `.github/workflows/`
 
 ## Agent control panel (Swamp)
@@ -108,7 +108,8 @@ Cursor remains the coding worker. Swamp is the control panel + line.
 - `factory/loop-notes.md` — what each factory loop taught us
 - `services/*` — product code and unit tests
 - `scripts/smoke-test.sh` — end-to-end happy path
-- `scripts/factory-gate.sh` — CI-parity local gate (when present)
+- `justfile` — local recipes (`up`, `seed`, `smoke`, `gate`, …)
+- `scripts/factory-gate.sh` — CI-parity local gate
 - `.github/ISSUE_TEMPLATE/factory-ticket.yml` — issue form for new tickets
 - `.github/workflows/*` — automatic inspectors per service
 - `models/command/shell/*` — Swamp factory control-panel models (when present)

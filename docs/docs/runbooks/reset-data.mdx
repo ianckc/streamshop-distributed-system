@@ -17,7 +17,7 @@ Use this runbook to wipe all local data and re-seed the system with fresh sample
 ### 1. Stop all services
 
 ```bash
-make down
+just down
 ```
 
 ### 2. Remove volumes
@@ -31,8 +31,8 @@ This deletes all Postgres, MongoDB, Redis Insight, MinIO, Redpanda, and ClickHou
 ### 3. Restart and seed
 
 ```bash
-make up
-make seed
+just up
+just seed
 ```
 
 The seed script (`scripts/seed.sh`):
@@ -47,7 +47,7 @@ There is no users table; orders take a `user_id` UUID in the request body. Mongo
 ### 4. Verify
 
 ```bash
-make smoke
+just smoke
 ```
 
 Expected output: catalog list includes `prod-001`, a sample order is created as `pending`, status becomes `processed` within 10 seconds, and `/api/analytics/orders/summary` reports `order_count >= 1`.
@@ -62,7 +62,7 @@ Expected output: catalog list includes `prod-001`, a sample order is created as 
 | Redis | `docker compose exec redis redis-cli FLUSHALL` |
 | MinIO | `docker compose exec minio mc rm --recursive --force local/product-images/` |
 
-After a partial reset, run `make seed` to restore sample catalog data and images.
+After a partial reset, run `just seed` to restore sample catalog data and images.
 
 ## Apply Postgres schema changes (existing volume)
 
@@ -72,8 +72,8 @@ Postgres runs `infra/postgres/init.sql` only when the `postgres_data` volume is 
 
 ```bash
 docker compose down -v
-make up
-make seed
+just up
+just seed
 ```
 
 **Keep data** — apply the migration script from the repo root:
