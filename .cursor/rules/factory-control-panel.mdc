@@ -1,0 +1,23 @@
+---
+description: Software factory control panel — prefer Swamp for tickets, gate, and contract
+alwaysApply: true
+---
+
+# Factory control panel (Swamp)
+
+When working in this repo, prefer these **approved Swamp operations** over inventing ad-hoc shell for factory ops:
+
+| Intent | Command |
+|--------|---------|
+| List Ready tickets | `swamp model method run list-ready-tickets execute` |
+| Show agent contract | `swamp model method run show-agents-contract execute` |
+| Check one ticket | `swamp model method run check-ticket-ready execute` (env `ISSUE_NUMBER`) |
+| Run quality gate | `swamp model method run factory-gate execute` (env `SERVICES`) |
+| Optional smoke gate | `swamp model method run smoke-gate execute` |
+| Run one factory job | `swamp workflow run run-ticket --input issue_number=N --input services=…` |
+
+Also read `AGENTS.md` for hard rules and ticket scope. Tickets live on [Project 10](https://github.com/users/ianckc/projects/10) (`Status = Ready`).
+
+Do **not** invent scope outside the active ticket. Do **not** bypass the gate: leave `just gate` / `factory-gate` green.
+
+Coding still happens here in Cursor; Swamp owns the line (check → pause → gate → bookkeeping).

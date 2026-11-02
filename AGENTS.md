@@ -89,7 +89,7 @@ append factory/loop-notes.md, and leave just gate green for the affected service
 
 ## Agent control panel (Swamp)
 
-Prefer these **approved** Swamp operations for factory ops (also mirrored in `.cursor/rules/factory-control-panel.mdc` once present):
+Prefer these **approved** Swamp operations for factory ops (also mirrored in `.cursor/rules/factory-control-panel.mdc`):
 
 | Intent | Command |
 |--------|---------|
@@ -105,7 +105,9 @@ Cursor remains the coding worker. Swamp is the control panel + line.
 ## Layout (factory-relevant)
 
 - `factory/` — factory meta (loop notes, how-to); not the Docusaurus site
+- `factory/software-factory.md` — how the factory line works
 - `factory/loop-notes.md` — what each factory loop taught us
+- `.cursor/rules/factory-control-panel.mdc` — always-on factory control panel
 - `services/*` — product code and unit tests
 - `scripts/smoke-test.sh` — end-to-end happy path
 - `justfile` — local recipes (`up`, `seed`, `smoke`, `gate`, …)

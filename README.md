@@ -35,6 +35,10 @@ With the stack up:
 | `just logs` | `docker compose logs -f` |
 | `just down` | `docker compose down` |
 
+## Software factory
+
+Scoped change line (GitHub Project tickets → Cursor → `just gate` / swamp `run-ticket`): see [`factory/software-factory.md`](factory/software-factory.md) and [`AGENTS.md`](AGENTS.md).
+
 Traefik is the HTTP entrypoint on **:8080** (APIs, docs at `/docs/`, admin agent at `/admin/`). Other consoles: Traefik [dashboard](http://localhost:8081), [Redis Insight](http://localhost:5540), [MinIO](http://localhost:9001), [Redpanda Console](http://localhost:8082). Redpanda Kafka API: `localhost:19092`. ClickHouse HTTP: `localhost:8123`.
 
 ### Observability stack (optional)
