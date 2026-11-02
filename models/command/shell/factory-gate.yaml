@@ -1,0 +1,20 @@
+type: command/shell
+typeVersion: 2026.02.09.1
+id: f00a415d-470a-4a16-9453-bbf352f75f8d
+name: factory-gate
+version: 1
+tags: {}
+globalArguments: {}
+methods:
+  execute:
+    arguments:
+      workingDir: .
+      timeout: 900000
+      run: |
+        set -euo pipefail
+        # SERVICES must be set by the caller (workflow / --input env.SERVICES=…)
+        if [ -z "${SERVICES:-}" ]; then
+          echo "SERVICES env is required (e.g. order-api,catalog-api)" >&2
+          exit 1
+        fi
+        just gate "$SERVICES"

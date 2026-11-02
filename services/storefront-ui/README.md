@@ -13,7 +13,7 @@ npm run dev
 
 ## Production (Compose)
 
-`make up` builds this image and routes:
+`just up` builds this image and routes:
 
 | URL | Purpose |
 |-----|---------|

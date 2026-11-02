@@ -120,7 +120,10 @@ pub async fn execute_tool(
 }
 
 async fn get_order(state: &AppState, args: &serde_json::Value) -> serde_json::Value {
-    let Some(order_id) = args.get("order_id").and_then(|v| v.as_str()).filter(|s| !s.is_empty())
+    let Some(order_id) = args
+        .get("order_id")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
     else {
         return serde_json::json!({
             "ok": false,

@@ -1,0 +1,13 @@
+type: command/shell
+typeVersion: 2026.02.09.1
+id: d7e62007-ab63-4ee8-ac61-50588713523d
+name: list-ready-tickets
+version: 1
+tags: {}
+globalArguments: {}
+methods:
+  execute:
+    arguments:
+      workingDir: .
+      timeout: 120000
+      run: ./factory/scripts/list-ready-tickets.sh

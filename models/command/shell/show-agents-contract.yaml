@@ -1,0 +1,17 @@
+type: command/shell
+typeVersion: 2026.02.09.1
+id: 7f1be637-e03e-4208-83d7-0aff3a2845d9
+name: show-agents-contract
+version: 1
+tags: {}
+globalArguments: {}
+methods:
+  execute:
+    arguments:
+      workingDir: .
+      timeout: 60000
+      run: |
+        set -euo pipefail
+        echo "=== Factory contract (AGENTS.md) ==="
+        echo
+        cat AGENTS.md

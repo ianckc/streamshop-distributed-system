@@ -38,10 +38,10 @@ Go HTTP service for creating orders and persisting them to PostgreSQL.
 From the repository root:
 
 ```bash
-make up && make seed
+just up && just seed
 ```
 
-Place orders at `http://localhost:8080/api/orders`. Health/ready: `http://localhost:3002/health` and `http://localhost:3002/ready`. End-to-end check: `make smoke`.
+Place orders at `http://localhost:8080/api/orders`. Health/ready: `http://localhost:3002/health` and `http://localhost:3002/ready`. End-to-end check: `just smoke`.
 
 ## Endpoints
 

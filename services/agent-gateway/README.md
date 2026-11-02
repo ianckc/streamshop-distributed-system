@@ -35,7 +35,7 @@ Default listen port is **3010** (StreamShop Traefik owns host `:8080`).
 
 ## Compose / Traefik
 
-With `make up`, Traefik routes:
+With `just up`, Traefik routes:
 
 | URL | Target |
 |-----|--------|
@@ -47,7 +47,7 @@ With `make up`, Traefik routes:
 curl -s http://localhost:8080/v1/agent/stream -o /dev/null -w '%{http_code}\n' \
   -H 'Content-Type: application/json' \
   -d '{"session_id":"smoke","message":"ping"}'
-# Or from repo root: make agent-smoke
+# Or from repo root: just agent-smoke
 ```
 
 LLM defaults assume Ollama on the host (`host.docker.internal:11434`). Override `LLM_*` in root `.env` or `services/agent-gateway/.env`.

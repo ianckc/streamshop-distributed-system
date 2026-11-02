@@ -8,7 +8,7 @@ sidebar_position: 1
 
 - Docker Desktop or Docker Engine + Compose v5.4+
 - Node.js 24 (only if you want to run the docs site locally)
-- Python 3 (used by `make smoke` to parse JSON)
+- Python 3 (used by `just smoke` to parse JSON)
 
 ## What works today
 
@@ -22,13 +22,13 @@ sidebar_position: 1
 | MongoDB 8 | Product catalog |
 | Redis 8 | Catalog cache-aside (TTL 60s) and order-api idempotency keys |
 | Redis Insight | Local GUI on `:5540` (not behind Traefik) |
-| MinIO | Presigned `image_url` on catalog list/detail; sample images via `make seed` |
+| MinIO | Presigned `image_url` on catalog list/detail; sample images via `just seed` |
 | Redpanda | Kafka API `:19092`; Console `:8082`; `orders.events` |
 | `event-processor` (Rust) | Consume `order.created` → ClickHouse + Postgres `processed` |
 | ClickHouse 24 | `order_events` on HTTP `:8123` |
 | `analytics-api` (Python) | `GET /api/analytics/orders/summary`, order detail |
 | `docs-site` (Docusaurus) | Static docs at `/docs/` via Traefik |
-| Makefile | `make up`, `make seed`, `make smoke`, `make logs`, `make down` |
+| justfile | `just up`, `just seed`, `just smoke`, `just gate`, `just logs`, `just down` |
 | Observability | `--profile observability`: OTel Collector, Jaeger `:16686`, Prometheus `:9090`, Grafana `:3000` |
 
 ## Run the stack
@@ -37,16 +37,16 @@ From the repository root:
 
 ```bash
 cp .env.example .env   # optional — defaults work out of the box
-make up && make seed && make smoke
+just up && just seed && just smoke
 ```
 
 | Target | What it does |
 |--------|----------------|
-| `make up` | Builds and starts Compose, waits for healthchecks |
-| `make seed` | Ensures Kafka topics, upserts sample products, uploads MinIO images, flushes Redis |
-| `make smoke` | Lists products, places an order, waits for `processed`, checks analytics |
-| `make logs` | Follows Compose logs |
-| `make down` | Stops the stack (volumes kept) |
+| `just up` | Builds and starts Compose, waits for healthchecks |
+| `just seed` | Ensures Kafka topics, upserts sample products, uploads MinIO images, flushes Redis |
+| `just smoke` | Lists products, places an order, waits for `processed`, checks analytics |
+| `just logs` | Follows Compose logs |
+| `just down` | Stops the stack (volumes kept) |
 
 This starts
 
@@ -72,7 +72,7 @@ Gateway: **:8080**. Docs: [http://localhost:8080/docs/](http://localhost:8080/do
 ### 30-second walkthrough
 
 1. Browse products: [http://localhost:8080/api/catalog/products](http://localhost:8080/api/catalog/products)
-2. Place an order (`make smoke`, or the curl below)
+2. Place an order (`just smoke`, or the curl below)
 3. Open [Redpanda Console](http://localhost:8082) and inspect topic `orders.events`
 4. The processor sets Postgres `orders.status` to `processed` and writes ClickHouse `order_events`
 5. Hit [http://localhost:8080/api/analytics/orders/summary](http://localhost:8080/api/analytics/orders/summary)
@@ -95,7 +95,7 @@ curl -s -X POST http://localhost:8080/api/orders \
 curl http://localhost:8080/api/analytics/orders/summary
 ```
 
-Mongo products also load from `infra/mongo/seed.js` on first start of an empty volume. `make seed` is idempotent if the volume already exists. See [catalog-api](../services/catalog-api).
+Mongo products also load from `infra/mongo/seed.js` on first start of an empty volume. `just seed` is idempotent if the volume already exists. See [catalog-api](../services/catalog-api).
 
 ### Health checks (direct)
 
@@ -116,17 +116,17 @@ Traefik dashboard: [http://localhost:8081](http://localhost:8081).
 ### Stop
 
 ```bash
-make down
+just down
 ```
 
-To wipe data and re-run Postgres init SQL and Mongo init seed: `docker compose down -v`, then `make up && make seed`.
+To wipe data and re-run Postgres init SQL and Mongo init seed: `docker compose down -v`, then `just up && just seed`.
 
 ## Run the docs site
 
 With Compose (recommended — same URL as in production):
 
 ```bash
-make up
+just up
 # http://localhost:8080/docs/
 ```
 

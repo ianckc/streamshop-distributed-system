@@ -14,7 +14,7 @@ Requires StreamShop Traefik (or agent-gateway) on `:8080` for SSE.
 
 ## Production (Compose)
 
-`make up` builds this image and routes:
+`just up` builds this image and routes:
 
 | URL | Purpose |
 |-----|---------|

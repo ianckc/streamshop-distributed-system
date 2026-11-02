@@ -5,7 +5,7 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 cd "$ROOT"
 
 hint_down() {
-  echo "hint: start the stack with: make up" >&2
+  echo "hint: start the stack with: just up" >&2
 }
 
 if ! docker compose exec -T redpanda rpk cluster health >/dev/null 2>&1; then

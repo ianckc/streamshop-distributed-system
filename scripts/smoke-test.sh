@@ -14,7 +14,7 @@ pass() {
 }
 
 hint_down() {
-  echo "hint: start the stack with: make up && make seed" >&2
+  echo "hint: start the stack with: just up && just seed" >&2
 }
 
 json_field() {
