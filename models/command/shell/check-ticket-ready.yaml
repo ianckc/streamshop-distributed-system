@@ -1,0 +1,13 @@
+type: command/shell
+typeVersion: 2026.02.09.1
+id: d62ab437-ec1c-4f0b-9234-fe124b64676c
+name: check-ticket-ready
+version: 1
+tags: {}
+globalArguments: {}
+methods:
+  execute:
+    arguments:
+      workingDir: .
+      timeout: 120000
+      run: ./factory/scripts/check-ticket-ready.sh

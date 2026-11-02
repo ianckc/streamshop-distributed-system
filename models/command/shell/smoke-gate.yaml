@@ -1,0 +1,13 @@
+type: command/shell
+typeVersion: 2026.02.09.1
+id: c1894f76-0a6f-42d3-9171-468b7f2e1f4d
+name: smoke-gate
+version: 1
+tags: {}
+globalArguments: {}
+methods:
+  execute:
+    arguments:
+      workingDir: .
+      timeout: 300000
+      run: just smoke

@@ -112,7 +112,8 @@ Cursor remains the coding worker. Swamp is the control panel + line.
 - `scripts/factory-gate.sh` — CI-parity local gate
 - `.github/ISSUE_TEMPLATE/factory-ticket.yml` — issue form for new tickets
 - `.github/workflows/*` — automatic inspectors per service
-- `models/command/shell/*` — Swamp factory control-panel models (when present)
+- `factory/scripts/` — Project ticket helpers used by swamp models
+- `models/command/shell/*` — Swamp factory control-panel models
 - `workflows/` — `run-ticket` factory line (when present)
 - `.swamp.yaml` — Swamp repo metadata (`.swamp/` runtime data is gitignored)
 - `docs/` — Docusaurus product docs site (do not put factory notes there)
