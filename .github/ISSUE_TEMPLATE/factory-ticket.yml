@@ -1,0 +1,73 @@
+name: Factory ticket
+description: Scoped work order for the StreamShop software factory line
+title: "[factory]: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for factory work. Keep scope tight so an agent can finish one ticket without inventing extras.
+
+        **After creating this issue:**
+        1. Add it to [Project 10 — StreamShop Distributed System](https://github.com/users/ianckc/projects/10).
+        2. Set **Status = Ready** when it is pickable on the factory line.
+        3. Move to **In progress** when a `run-ticket` job starts; **Done** at bookkeeping.
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: One or two sentences — what changes for users or operators when this ships.
+      placeholder: e.g. Reject oversized order payloads with a clear 400 so clients can fix the request.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: affected-services
+    attributes:
+      label: Affected services
+      description: Services (or areas) this ticket may change. The factory gate runs tests for these.
+      multiple: true
+      options:
+        - order-api
+        - catalog-api
+        - analytics-api
+        - event-processor
+        - agent-gateway
+        - storefront-ui
+        - admin-ui
+        - infra/docs
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Observable checks that prove the ticket is done. Prefer status codes, JSON shape, and failure modes.
+      value: |
+        - [ ]
+        - [ ]
+        - [ ] `make gate SERVICES=<affected>` stays green
+    validations:
+      required: true
+
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What this ticket must not do. Agents must not invent work beyond the Goal / Acceptance.
+      placeholder: e.g. No auth changes. No new services. No AWS deploy work.
+    validations:
+      required: true
+
+  - type: textarea
+    id: test-plan
+    attributes:
+      label: Test plan
+      description: What the factory gate (and optional smoke) must prove for this ticket.
+      value: |
+        - Unit / service tests for every behavior change in Affected services
+        - Optional: `make smoke` if this touches the order → outbox → analytics path
+    validations:
+      required: true
