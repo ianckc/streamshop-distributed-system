@@ -1,0 +1,105 @@
+id: 06d2e585-2da7-438d-a802-878d78aa414c
+name: run-ticket
+description: >
+  Factory line for one GitHub Project ticket — check Ready/In progress,
+  pause for Cursor coding, run factory-gate, then bookkeeping reminder.
+version: 1
+tags: {}
+inputs:
+  type: object
+  properties:
+    issue_number:
+      type: string
+      description: GitHub issue number on Project 10 (Status Ready or In progress)
+    services:
+      type: string
+      description: >
+        Comma-separated affected services for just gate
+        (e.g. order-api,catalog-api). Required for the gate step.
+  required:
+    - issue_number
+    - services
+  additionalProperties: false
+jobs:
+  - name: factory
+    description: One ticket through the factory line
+    dependsOn: []
+    weight: 0
+    steps:
+      - name: check-ready
+        description: Ensure the issue is on Project 10 with Status Ready or In progress
+        weight: 0
+        allowFailure: false
+        dependsOn: []
+        task:
+          type: model_method
+          modelIdOrName: check-ticket-ready
+          methodName: execute
+          inputs:
+            env:
+              ISSUE_NUMBER: ${{ inputs.issue_number }}
+
+      - name: implement-in-cursor
+        description: Human/agent implements the ticket, then approve to continue
+        weight: 0
+        allowFailure: false
+        dependsOn:
+          - step: check-ready
+            condition:
+              type: succeeded
+        task:
+          type: manual_approval
+          prompt: >
+            Implement ONLY GitHub issue #${{ inputs.issue_number }} following AGENTS.md.
+            Set Project Status to In progress. Add tests in the affected services
+            (${{ inputs.services }}). Do not invent scope.
+            When gate-ready locally (just gate ${{ inputs.services }}), approve this
+            step to run the Swamp factory-gate.
+          timeout: 86400
+
+      - name: run-gate
+        description: Run CI-parity factory gate for the ticket's services
+        weight: 0
+        allowFailure: false
+        dependsOn:
+          - step: implement-in-cursor
+            condition:
+              type: succeeded
+        task:
+          type: model_method
+          modelIdOrName: factory-gate
+          methodName: execute
+          inputs:
+            env:
+              SERVICES: ${{ inputs.services }}
+
+      - name: assert-gate-green
+        description: Require factory-gate exit code 0
+        weight: 0
+        allowFailure: false
+        dependsOn:
+          - step: run-gate
+            condition:
+              type: succeeded
+        task:
+          type: assert
+          severity: high
+          message: factory-gate did not exit 0
+          expr: >-
+            int(data.latest("factory-gate", "result").attributes.exitCode) == 0
+
+      - name: bookkeeping-reminder
+        description: Confirm Project Status Done and loop-notes after green gate
+        weight: 0
+        allowFailure: false
+        dependsOn:
+          - step: assert-gate-green
+            condition:
+              type: succeeded
+        task:
+          type: manual_approval
+          prompt: >
+            Gate is green. Finish bookkeeping for issue #${{ inputs.issue_number }}:
+            set Project Status to Done, check acceptance criteria on the issue,
+            append factory/loop-notes.md. Approve when that is done.
+          timeout: 86400

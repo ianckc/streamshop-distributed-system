@@ -114,6 +114,6 @@ Cursor remains the coding worker. Swamp is the control panel + line.
 - `.github/workflows/*` — automatic inspectors per service
 - `factory/scripts/` — Project ticket helpers used by swamp models
 - `models/command/shell/*` — Swamp factory control-panel models
-- `workflows/` — `run-ticket` factory line (when present)
+- `workflows/workflow-run-ticket.yaml` — `run-ticket` factory line
 - `.swamp.yaml` — Swamp repo metadata (`.swamp/` runtime data is gitignored)
 - `docs/` — Docusaurus product docs site (do not put factory notes there)
