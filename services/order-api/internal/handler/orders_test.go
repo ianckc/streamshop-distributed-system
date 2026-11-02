@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -176,6 +177,75 @@ func TestOrderHandlerCreate(t *testing.T) {
 
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusCreated, rec.Body.String())
+		}
+	})
+
+	t.Run("rejects duplicate product_id", func(t *testing.T) {
+		h := handler.OrderHandler{
+			Store: fakeOrderStore{
+				createFn: func(context.Context, model.Order) (model.Order, error) {
+					t.Fatal("store should not be called")
+					return model.Order{}, nil
+				},
+			},
+		}
+
+		body := `{
+			"user_id": "660e8400-e29b-41d4-a716-446655440001",
+			"items": [
+				{"product_id": "prod-001", "qty": 1, "price_pence": 1999},
+				{"product_id": "prod-001", "qty": 2, "price_pence": 1999}
+			]
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/api/orders", bytes.NewBufferString(body))
+		rec := httptest.NewRecorder()
+
+		h.Create(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+		}
+		var got map[string]any
+		if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		errMsg, _ := got["error"].(string)
+		if errMsg == "" || !strings.Contains(errMsg, "duplicate") {
+			t.Fatalf("error = %q, want message mentioning duplicate", errMsg)
+		}
+	})
+
+	t.Run("creates order with distinct product_ids", func(t *testing.T) {
+		h := handler.OrderHandler{
+			Store: fakeOrderStore{
+				createFn: func(_ context.Context, order model.Order) (model.Order, error) {
+					order.CreatedAt = time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+					return order, nil
+				},
+			},
+		}
+
+		body := `{
+			"user_id": "660e8400-e29b-41d4-a716-446655440001",
+			"items": [
+				{"product_id": "prod-001", "qty": 1, "price_pence": 1999},
+				{"product_id": "prod-002", "qty": 1, "price_pence": 2499}
+			]
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/api/orders", bytes.NewBufferString(body))
+		rec := httptest.NewRecorder()
+
+		h.Create(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusCreated, rec.Body.String())
+		}
+		var got map[string]any
+		if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if got["total_pence"] != float64(4498) {
+			t.Fatalf("total_pence = %v, want 4498", got["total_pence"])
 		}
 	})
 
