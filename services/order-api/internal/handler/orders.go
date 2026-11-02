@@ -221,11 +221,16 @@ func buildOrder(req createOrderRequest) (model.Order, error) {
 		return model.Order{}, errors.New("items must not be empty")
 	}
 
+	seenProductIDs := make(map[string]struct{}, len(req.Items))
 	items := make([]model.OrderItem, 0, len(req.Items))
 	for i, item := range req.Items {
 		if item.ProductID == "" {
 			return model.Order{}, fmt.Errorf("items[%d].product_id is required", i)
 		}
+		if _, dup := seenProductIDs[item.ProductID]; dup {
+			return model.Order{}, fmt.Errorf("duplicate product_id %q", item.ProductID)
+		}
+		seenProductIDs[item.ProductID] = struct{}{}
 		if item.Qty <= 0 {
 			return model.Order{}, fmt.Errorf("items[%d].qty must be greater than 0", i)
 		}
